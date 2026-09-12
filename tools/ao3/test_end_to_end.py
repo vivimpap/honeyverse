@@ -28,6 +28,13 @@ def blurb(wid, chapters, datetime_text="15 Jan 2024"):
   <dt class="chapters">Chapters:</dt><dd class="chapters">{chapters}</dd>
   <dt class="hits">Hits:</dt><dd class="hits">10</dd></dl></li>'''
 
+def navigate_page(first_date):
+    return (f'<ol class="chapter index group">'
+            f'<li><a href="/works/1/chapters/1">Chapter 1</a> '
+            f'<span class="datetime">({first_date})</span></li>'
+            f'<li><a href="/works/1/chapters/2">Chapter 2</a> '
+            f'<span class="datetime">(2024-01-15)</span></li></ol>')
+
 def work_page(published):
     return f'''<h2 class="title heading">Fic</h2>
  <dl class="work meta group"><dd class="stats"><dl class="stats">
@@ -44,6 +51,8 @@ PAGE1 = "<ol>" + "".join(blurb(w, "1/1") for w in ONESHOTS) + \
 
 listing_hits, work_hits = [], []
 class FakeAO3:
+    last_elapsed = 0.0
+    last_bytes = 0
     def __init__(self, limiter): pass
     def get(self, url):
         if "/tags/" in url:
@@ -52,9 +61,10 @@ class FakeAO3:
             html = PAGE1 if page == 1 else "<ol></ol>"
             return ("ok", types.SimpleNamespace(text=html, url=url, status_code=200))
         work_hits.append(url)
-        wid = int(url.split("/works/")[1].split("?")[0])
-        return ("ok", types.SimpleNamespace(
-            text=work_page(f"20{wid % 100:02d}-06-09"), url=url, status_code=200))
+        wid = int(url.split("/works/")[1].split("?")[0].split("/")[0])
+        body = (navigate_page(f"20{wid % 100:02d}-06-09") if "/navigate" in url
+                else work_page(f"20{wid % 100:02d}-06-09"))
+        return ("ok", types.SimpleNamespace(text=body, url=url, status_code=200))
 
 A.Fetcher = FakeAO3
 tmp = tempfile.mkdtemp(); os.chdir(tmp)
@@ -82,8 +92,10 @@ check("one-shot pages never fetched",
 # multichapter: filled from the fic page
 check("multichapter date from fic page", by_id["20"]["published"], "2020-06-09")
 check("only multichapter fetched", sorted(
-    u.split("/works/")[1].split("?")[0] for u in work_hits),
+    u.split("/works/")[1].split("?")[0].split("/")[0] for u in work_hits),
     sorted(str(w) for w in MULTI))
+check("uses the light chapter index, not the full work page",
+      all("/navigate" in u for u in work_hits), True)
 # listing-derived fields survive the fill pass untouched
 check("status_label kept", by_id["20"]["status_label"], "Updated")
 check("relationships kept", by_id["20"]["relationships"], "Choi Jiung/Yoon Keeho")

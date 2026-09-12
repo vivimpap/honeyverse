@@ -203,6 +203,8 @@ class Fetcher:
 
     def __init__(self, limiter):
         self.limiter = limiter
+        self.last_elapsed = 0.0
+        self.last_bytes = 0
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": USER_AGENT,
@@ -225,7 +227,10 @@ class Fetcher:
         while True:
             self.limiter.wait()
             try:
+                _t0 = time.monotonic()
                 resp = self.session.get(url, timeout=60)
+                self.last_elapsed = time.monotonic() - _t0
+                self.last_bytes = len(resp.content)
             except requests.RequestException as e:
                 if server_try >= len(SERVER_ERROR_WAITS):
                     print(f"  ! network still failing ({e})", end=" ")
@@ -753,6 +758,52 @@ def run_update(fetcher, quiet_pages=3):
 
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+NAV_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+
+
+def navigate_url(row):
+    """The fic's chapter-index page.
+
+    This is the cheap way to get the original publish date. A work page carries
+    the whole chapter text - often megabytes on a longfic - and we want exactly
+    one date out of it. The navigate page is built with
+
+        @work.chapters_in_order(include_content: false)
+
+    so it is a few KB however long the fic is, it needs no login (the works
+    controller lists :navigate among the users_only exceptions), and because
+    the chapters come in order its first entry is chapter 1 - whose date is,
+    by definition, the work's publication date.
+    """
+    base = (row.get("url") or "").strip()
+    if not base:
+        wid = (row.get("work_id") or "").strip()
+        if not wid:
+            return None
+        base = f"https://archiveofourown.org/works/{wid}"
+    parts = urlparse(base)
+    path = parts.path.rstrip("/")
+    if not path.endswith("/navigate"):
+        path += "/navigate"
+    q = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+         if k != "view_adult"]
+    q.append(("view_adult", "true"))
+    return urlunparse(parts._replace(path=path, query=urlencode(q)))
+
+
+def extract_published_from_navigate(html):
+    """Chapter 1's date from the chapter index. '' if the page isn't one."""
+    soup = BeautifulSoup(html, PARSER)
+    ol = soup.select_one("ol.chapter.index") or soup.select_one("ol.chapter")
+    if not ol:
+        return ""
+    first = ol.find("li")
+    if not first:
+        return ""
+    span = first.select_one("span.datetime")
+    text = span.get_text(strip=True) if span else first.get_text(" ", strip=True)
+    m = NAV_DATE_RE.search(text or "")
+    return m.group(1) if m else ""
 
 
 def extract_published(html):
@@ -812,9 +863,10 @@ def run_fill_published(fetcher, csv_path=None, save_every=25,
         sample = pending[:test_n]
         print(f"\nTEST MODE - fetching {len(sample)} works, writing nothing.\n")
         for r in sample:
-            url = fic_url(r)
             print("=" * 66)
             print(f"work_id   : {r.get('work_id', '')}")
+            print(f"chapters  : {r.get('chapters', '')}")
+            url = navigate_url(r) if not refresh_status else fic_url(r)
             print(f"url       : {url}")
             if not url:
                 print("  ! row has neither url nor work_id; would be skipped")
@@ -823,12 +875,13 @@ def run_fill_published(fetcher, csv_path=None, save_every=25,
             if kind != "ok":
                 print(f"  ! fetch failed ({kind})")
                 continue
-            published, label, sdate, dd_html = extract_published(resp.text)
-            soup = BeautifulSoup(resp.text, PARSER)
-            title = soup.select_one("h2.title.heading")
-            print(f"title     : {title.get_text(strip=True) if title else '?'}")
-            print(f"chapters  : {r.get('chapters', '')}")
-            print(f"raw <dd>  : {dd_html or '(dd.published NOT FOUND)'}")
+            print(f"downloaded: {fetcher.last_bytes / 1024:.0f} KB in "
+                  f"{fetcher.last_elapsed:.1f}s")
+            if refresh_status:
+                published, label, sdate, _ = extract_published(resp.text)
+            else:
+                published = extract_published_from_navigate(resp.text)
+                label = sdate = "(not read - navigate page)"
             print(f"-> published   : {published or '(empty)'}"
                   f"{'' if DATE_RE.match(published or '') else '   <-- NOT YYYY-MM-DD'}")
             print(f"   CSV had     : {(r.get('published') or '(empty)')}")
@@ -843,11 +896,16 @@ def run_fill_published(fetcher, csv_path=None, save_every=25,
     filled = failed = skipped = 0
     consecutive_errors = 0
     since_save = 0
+    bytes_total = fetch_seconds = 0.0
     t0 = time.monotonic()
+
+    # The chapter index carries the date without the chapter text. Only fall
+    # back to the (much heavier) work page when we also need the status pair.
+    use_work_page = refresh_status
 
     try:
         for i, r in enumerate(pending, 1):
-            url = fic_url(r)
+            url = fic_url(r) if use_work_page else navigate_url(r)
             wid = r.get("work_id", "?")
             print(f"[{i}/{len(pending)}] {wid}...", end=" ", flush=True)
 
@@ -857,6 +915,8 @@ def run_fill_published(fetcher, csv_path=None, save_every=25,
                 continue
 
             kind, resp = fetcher.get(url)
+            bytes_total += fetcher.last_bytes
+            fetch_seconds += fetcher.last_elapsed
 
             if kind in ("restricted", "notfound"):
                 # Permanent: no amount of retrying produces a date.
@@ -878,7 +938,21 @@ def run_fill_published(fetcher, csv_path=None, save_every=25,
                 continue
 
             consecutive_errors = 0
-            published, label, sdate, _ = extract_published(resp.text)
+            if use_work_page:
+                published, label, sdate, _ = extract_published(resp.text)
+            else:
+                published = extract_published_from_navigate(resp.text)
+                label = sdate = ""
+                if not published:
+                    # Not a chapter index we recognise. Pay for the full work
+                    # page once rather than lose the row.
+                    fallback = fic_url(r)
+                    if fallback:
+                        kind2, resp2 = fetcher.get(fallback)
+                        bytes_total += fetcher.last_bytes
+                        fetch_seconds += fetcher.last_elapsed
+                        if kind2 == "ok":
+                            published, label, sdate, _ = extract_published(resp2.text)
 
             if not published:
                 failed += 1
@@ -897,7 +971,8 @@ def run_fill_published(fetcher, csv_path=None, save_every=25,
                     r["status_date"] = sdate
             filled += 1
             since_save += 1
-            print(f"{published}")
+            print(f"{published}  ({fetcher.last_elapsed:.1f}s, "
+                  f"{fetcher.last_bytes / 1024:.0f} KB)")
 
             if since_save >= save_every:
                 write_table(rows, fieldnames, path)
@@ -910,8 +985,14 @@ def run_fill_published(fetcher, csv_path=None, save_every=25,
 
     left = sum(1 for r in rows if not (r.get("published") or "").strip())
     mins = (time.monotonic() - t0) / 60
+    done = filled + failed + skipped
     print(f"\nDone in {mins:.1f} min. Filled: {filled} | "
           f"errored (still pending): {failed} | skipped: {skipped}")
+    if done:
+        print(f"Per fic: {fetch_seconds / done:.1f}s downloading, "
+              f"{bytes_total / done / 1024:.0f} KB average. "
+              f"(If the download time is the big number, it's AO3 or your "
+              f"connection, not the pacing.)")
     print(f"Rows still without a publish date: {left}")
     if failed:
         print("Errored rows were left empty on purpose - rerun the same "

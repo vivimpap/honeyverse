@@ -97,6 +97,19 @@ date. For a fic with **one posted chapter** those are the same date, so it's
 filled from the listing — typically ~75% of a fandom. The rest cost one request
 each, which the plain run spends automatically so you get a complete column.
 
+It fetches **`/works/<id>/navigate`**, not the work page. That matters a lot:
+a work page ships the entire chapter text — often megabytes on a longfic — and
+we want exactly one date out of it. The navigate page is rendered with
+`@work.chapters_in_order(include_content: false)`, so it's a few KB no matter
+how long the fic is, it needs no login (`works_controller` lists `:navigate`
+among the `users_only` exceptions), and since chapters come in order its first
+entry is chapter 1 — whose date *is* the publication date. If a navigate page
+ever comes back unusable, it pays for the full work page once for that row
+rather than losing it.
+
+The run prints per-fic download time and size, so if it's ever slow again you
+can see immediately whether the time is going into downloading or into pacing.
+
 The only rows that can end up without a date are multi-chapter fics that are
 restricted or deleted, where AO3 won't serve the page at all. Those are left
 **empty on purpose** rather than back-filled with the revised date, which would
