@@ -1,30 +1,31 @@
 # AO3 fast scraper
 
 Replaces the old two-script workflow (`ao3_phase1_ids.py` + `ao3_phase2_metadata.py`)
-with a single pass. Same CSV columns, same `' ; '` separator, ~100x faster.
+with a single pass. Same CSV columns, same `' ; '` separator, ~90x faster.
 
 ## Why it's faster
 
 The old Phase 2 fetched one page per fic. It never needed to. AO3's **work
 listing pages already contain the full metadata for every fic they list** — and
-they list 25 fics per page.
+they list 20 fics per page.
 
-Three things were checked directly against [otwarchive](https://github.com/otwcode/otwarchive),
-AO3's own source, rather than assumed:
+Three things were checked rather than assumed — two against
+[otwarchive](https://github.com/otwcode/otwarchive) (AO3's own source), and the
+page size against live AO3, because the repo's config is only a sample:
 
 | Question | Where it's answered | What AO3 actually does |
 |---|---|---|
 | Does the listing truncate the tag list with "…"? | `blurb_tag_block` (`app/helpers/tags_helper.rb`) | **No.** Every relationship/character/freeform tag is written into the HTML. The "…" is CSS. |
-| How many fics does one listing page carry? | `ITEMS_PER_PAGE` (`config/config.yml`), resolved via `Search::Query#per_page` with no override in `works_controller` / `work_search_form` / `work_query` | **25.** So one request replaces 25. |
+| How many fics does one listing page carry? | Measured against live AO3 | **20.** So one request replaces 20. (otwarchive's *sample* `config.yml` says `ITEMS_PER_PAGE: 25`; production overrides it. Trust the live count, not the repo default.) |
 | How fast may I request? | `RATE_LIMIT_NUMBER` / `RATE_LIMIT_PERIOD` (`config/config.yml`) | **300 requests / 300 seconds** = 1/sec. The old scripts' 5–8 s was ~6× stricter than required. |
 
-So: 25× fewer requests, each ~4× sooner. A 10,000-fic tag goes from roughly
-19 hours to about 10 minutes — and hits ~25× fewer 525s along the way, because
+So: 20× fewer requests, each ~4× sooner. A 10,000-fic tag goes from roughly
+19 hours to about 13 minutes — and hits ~20× fewer 525s along the way, because
 a 525 is Cloudflare failing to reach AO3's origin, not your rate limit.
 
-The scraper doesn't hard-code 25 anywhere — it reads however many blurbs a page
-actually returns, and stops when AO3 says there's no next page. The number only
-feeds the estimate above, so nothing breaks if AO3 changes it.
+The scraper doesn't hard-code the page size anywhere — it reads however many
+blurbs a page actually returns, and stops when AO3 says there's no next page.
+The number only feeds the estimate above.
 
 ## Usage
 
@@ -77,11 +78,18 @@ This script pins `sort_column=created_at&sort_direction=asc`, which
 `work_query.rb` tie-breaks by `id`: a stable total order where existing fics
 never move. (If your `TAG_URL` already specifies a sort, yours is respected.)
 
-**Paging ceiling.** `MAX_SEARCH_RESULTS` is 100,000 and `Search::Query#page`
-clamps with `.min` — so requesting page 5000 silently re-serves page 4000
-forever rather than erroring. The old `MAX_PAGE = 5000` would burn ~1000 wasted
-requests at the end of a big tag. This stops at 4000 and tells you to split by
-date range.
+**Paging ceiling.** `Search::Query#page` clamps with `.min` against
+`(MAX_SEARCH_RESULTS / per_page).ceil`, so past the ceiling AO3 silently
+re-serves the last real page instead of erroring — the old `MAX_PAGE = 5000`
+just burned requests there.
+
+Both numbers in that formula are deployment config you can't read from outside
+(this is exactly where trusting the repo's sample `ITEMS_PER_PAGE` would put the
+ceiling in the wrong place), so this script doesn't compute it — it *detects*
+it. Two consecutive full pages with zero new fics means AO3 has stopped
+paginating; it stops and tells you to split `TAG_URL` by date range. It also
+deliberately does **not** mark the tag complete in that case, so a later
+`--update` won't assume full coverage.
 
 ## Verifying
 

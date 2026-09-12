@@ -6,8 +6,8 @@ workflow with a single pass over the tag's listing pages.
 WHY THIS IS FASTER
 ------------------
 The old Phase 2 fetched one page per fic. That was never necessary: AO3's work
-listing pages already embed the full metadata for every fic they list, and they
-list 25 fics per page. So one request gives you 25 fics instead of 1.
+listing pages already embed the full metadata for every fic they list, and
+they list 20 fics per page. So one request gives you 20 fics instead of 1.
 
 Two things people assume are wrong, and both are worth knowing:
 
@@ -21,12 +21,16 @@ Two things people assume are wrong, and both are worth knowing:
      This script self-limits to 200 per 300s, which is a third under the limit
      and still ~4x faster per request than the old delay.
 
-Combined: ~25x fewer requests, each ~4x sooner. For a 10,000-fic tag that is
-roughly 19 hours -> ~10 minutes.
+Combined: ~20x fewer requests, each ~4x sooner. For a 10,000-fic tag that is
+roughly 19 hours -> ~13 minutes.
 
-It also means ~25x fewer chances to hit a 525. Those errors aren't your rate
+It also means ~20x fewer chances to hit a 525. Those errors aren't your rate
 limit - 525 is Cloudflare failing to reach AO3's origin - so they're retried
 fast here (2s, 5s, 10s...) instead of the old 15-60s ladder.
+
+(20 per page is what AO3 actually serves. The otwarchive repo's sample config
+says 25; production overrides it. Nothing here depends on the number - the
+script reads however many blurbs a page returns.)
 
 OUTPUT
 ------
@@ -99,8 +103,15 @@ OUTAGE_THRESHOLD = 10          # consecutive hard failures -> assume AO3 is down
 
 # ================================================================
 
-MAX_PAGE_HARD_CAP = 4000       # AO3 clamps paging at MAX_SEARCH_RESULTS/25.
-                               # Past this it silently re-serves page 4000.
+# AO3 clamps deep paging: Search::Query#page does
+#   [requested_page, (MAX_SEARCH_RESULTS / per_page).ceil].min
+# so past the ceiling it silently re-serves the last real page instead of
+# erroring. Both of those numbers are deployment config we can't read from
+# outside, so don't try to compute the ceiling - detect it. When the clamp
+# kicks in we get a full page whose fics we've all seen before, which is what
+# CLAMP_REPEAT_LIMIT below watches for. This is just a runaway stop.
+MAX_PAGE_SAFETY_LIMIT = 20000
+CLAMP_REPEAT_LIMIT = 2         # full pages with zero new fics -> we're stuck
 
 OUTPUT_CSV = f"{PROJECT_NAME}_metadata.csv"
 PROGRESS_FILE = f"{PROJECT_NAME}_progress.txt"
@@ -502,19 +513,20 @@ def run_scrape(fetcher):
     if not exists:
         writer.writeheader()
 
-    print(f"Scraping listing pages (25 fics each), starting at page {start}.")
+    print(f"Scraping listing pages (~20 fics each), starting at page {start}.")
     print(f"Already saved: {len(seen)} fics -> {OUTPUT_CSV}")
     print(f"Parser: {PARSER} | budget: {MAX_REQUESTS_PER_WINDOW} req / "
           f"{WINDOW_SECONDS}s (AO3 allows 300)\n")
 
     added_total = approx_total = 0
     consecutive_errors = 0
+    stale_pages = 0
     completed = False
     t0 = time.monotonic()
 
     try:
         page = start
-        while page <= MAX_PAGE_HARD_CAP:
+        while page <= MAX_PAGE_SAFETY_LIMIT:
             print(f"page {page}...", end=" ", flush=True)
             kind, resp = fetcher.get(build_listing_url(page))
 
@@ -553,10 +565,24 @@ def run_scrape(fetcher):
                 print("last page reached -> done.")
                 completed = True
                 break
+
+            # Every fic on a full page was already on file. Either AO3 has
+            # clamped us at its paging ceiling and is re-serving the same page,
+            # or we're re-reading ground we covered. Either way, going further
+            # costs requests and returns nothing.
+            stale_pages = stale_pages + 1 if added == 0 else 0
+            if stale_pages >= CLAMP_REPEAT_LIMIT:
+                print(f"\n{stale_pages} pages in a row with nothing new - AO3 "
+                      f"has stopped paginating (its deep-paging ceiling).\n"
+                      f"Everything up to here is saved. To get the rest, split "
+                      f"TAG_URL by date range, e.g. add\n"
+                      f"  &work_search[date_from]=2020-01-01"
+                      f"&work_search[date_to]=2020-12-31\n"
+                      f"and rerun with a different PROJECT_NAME per slice.")
+                break
             page += 1
         else:
-            print(f"\nHit AO3's paging ceiling (page {MAX_PAGE_HARD_CAP} = "
-                  f"100,000 fics). Split TAG_URL by date range to get the rest.")
+            print(f"\nStopped at the {MAX_PAGE_SAFETY_LIMIT}-page safety limit.")
     except KeyboardInterrupt:
         print("\nInterrupted. Rerun the same command to resume.")
     finally:
@@ -611,7 +637,7 @@ def run_update(fetcher, quiet_pages=3):
     quiet = 0
     page = 1
     try:
-        while page <= MAX_PAGE_HARD_CAP and quiet < quiet_pages:
+        while page <= MAX_PAGE_SAFETY_LIMIT and quiet < quiet_pages:
             print(f"page {page}...", end=" ", flush=True)
             kind, resp = fetcher.get(build_listing_url(page, stable_sort=False))
             if kind != "ok":
