@@ -39,6 +39,33 @@ python3 ao3_fast.py --verify 15      # spot-check against real fic pages
 python3 ao3_fast.py --update         # later: pull in new/changed fics
 ```
 
+### Filling `published` on a CSV you already have
+
+`--fill-published` works on any CSV with `work_id` / `url` / `published`
+columns, not just one this script produced:
+
+```bash
+# 1. look before you leap: fetch 3 works, print what was parsed, write nothing
+python3 ao3_fast.py --fill-published --csv mi_fandom_metadata.csv --test 3
+
+# 2. if those look right, the full pass
+python3 ao3_fast.py --fill-published --csv mi_fandom_metadata.csv
+```
+
+- Only rows whose `published` is **empty** are fetched. Rows that already have
+  a date are never re-downloaded and never modified.
+- Only the `published` cell is written. Every other column survives verbatim,
+  **including columns this script has never heard of** — the file is rewritten
+  against its own header, not against the script's field list. (Add
+  `--refresh-status` if you also want `status_label` / `status_date` refreshed
+  from the fic page while you're paying for the request anyway.)
+- A one-time `.bak` copy of the original is written before the first rewrite.
+- The CSV is rewritten every `--save-every` rows (default 25), atomically via a
+  temp file, so a crash or Ctrl-C can't leave you with a half-written CSV.
+- **Resumable**: rows that error out are deliberately left empty, so rerunning
+  the same command retries exactly those and nothing else. Restricted and
+  deleted works are skipped permanently (no date exists to fetch).
+
 ## Output
 
 Byte-identical column contract to the old Phase 2:

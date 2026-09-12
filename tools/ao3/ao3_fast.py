@@ -64,6 +64,7 @@ Every mode is resumable: rerun the same command and it continues.
 import argparse
 import csv
 import os
+import random
 import re
 import sys
 import time
@@ -94,7 +95,16 @@ PROJECT_NAME = "myfandom"
 
 MAX_REQUESTS_PER_WINDOW = 200
 WINDOW_SECONDS = 300
-MIN_SECONDS_BETWEEN_REQUESTS = 1.5
+
+# Randomised gap between requests, so there's no fixed pattern. The rolling
+# window above is still the hard ceiling - these only decide the pacing inside
+# it, and a retry burns budget like any other request.
+DELAY_MIN = 1.2
+DELAY_MAX = 2.5
+
+# Periodic longer pause, on top of the per-request gap.
+LONG_REST_EVERY = 200          # requests
+LONG_REST_SECONDS = 30
 
 # 525/502/503 are AO3/Cloudflare hiccups, not your rate limit -> retry fast.
 SERVER_ERROR_WAITS = [2, 5, 10, 20, 40]
@@ -144,16 +154,28 @@ except ImportError:
 class RateLimiter:
     """Rolling-window limiter. Guarantees we never exceed the budget."""
 
-    def __init__(self, max_requests, period, min_gap):
+    def __init__(self, max_requests, period, delay_min, delay_max,
+                 long_rest_every=0, long_rest_seconds=0):
         self.max_requests = max_requests
         self.period = period
-        self.min_gap = min_gap
+        self.delay_min = delay_min
+        self.delay_max = delay_max
+        self.long_rest_every = long_rest_every
+        self.long_rest_seconds = long_rest_seconds
+        self.count = 0
         self.times = deque()
 
     def wait(self):
+        if (self.long_rest_every and self.count
+                and self.count % self.long_rest_every == 0):
+            print(f"\n  (resting {self.long_rest_seconds}s after "
+                  f"{self.long_rest_every} requests)", flush=True)
+            time.sleep(self.long_rest_seconds)
+        self.count += 1
+
         now = time.monotonic()
         if self.times:
-            gap = self.min_gap - (now - self.times[-1])
+            gap = random.uniform(self.delay_min, self.delay_max) - (now - self.times[-1])
             if gap > 0:
                 time.sleep(gap)
                 now = time.monotonic()
@@ -598,17 +620,63 @@ def run_scrape(fetcher):
         print(f"{approx_total} fics were updated in the last 30 days, so AO3 "
               f"showed a relative date ('3 days'); those dates are "
               f"day-accurate but derived. --fill-published makes them exact.")
-    missing = sum(1 for r in read_rows() if not r.get("published"))
+    missing = sum(1 for r in read_table()[0] if not r.get("published"))
     if missing:
         print(f"{missing} multi-chapter fics have no 'published' date yet. "
               f"Run: python3 {os.path.basename(__file__)} --fill-published")
 
 
-def read_rows():
-    if not os.path.exists(OUTPUT_CSV):
-        return []
-    with open(OUTPUT_CSV, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def read_table(path=None):
+    """Read a CSV, keeping its own header exactly as written.
+
+    Returns (rows, fieldnames). We never assume the file's columns are FIELDS:
+    a CSV you've edited or annotated elsewhere may carry extra columns, and
+    rewriting it against FIELDS would silently drop them.
+    """
+    path = path or OUTPUT_CSV
+    if not os.path.exists(path):
+        return [], list(FIELDS)
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+        fieldnames = list(reader.fieldnames or FIELDS)
+    return rows, fieldnames
+
+
+def write_table(rows, fieldnames, path=None):
+    """Atomically rewrite the CSV with its original header and column order."""
+    path = path or OUTPUT_CSV
+    tmp = path + ".tmp"
+    with open(tmp, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: r.get(k, "") for k in fieldnames})
+    os.replace(tmp, path)
+
+
+def backup_once(path):
+    """Keep one pristine copy before the first in-place rewrite."""
+    bak = path + ".bak"
+    if os.path.exists(path) and not os.path.exists(bak):
+        with open(path, "rb") as src, open(bak, "wb") as dst:
+            dst.write(src.read())
+        print(f"Backup of the original saved to {bak}\n")
+
+
+def fic_url(row):
+    """Per-fic URL from the row's own `url` column, with view_adult=true."""
+    u = (row.get("url") or "").strip()
+    if not u:
+        wid = (row.get("work_id") or "").strip()
+        if not wid:
+            return None
+        u = f"https://archiveofourown.org/works/{wid}"
+    parts = urlparse(u)
+    q = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+         if k != "view_adult"]
+    q.append(("view_adult", "true"))
+    return urlunparse(parts._replace(query=urlencode(q)))
 
 
 def run_update(fetcher, quiet_pages=3):
@@ -618,7 +686,7 @@ def run_update(fetcher, quiet_pages=3):
     until it sees `quiet_pages` pages in a row with nothing new or changed.
     Cheap: for a tag that gained a handful of fics this is 3-4 requests.
     """
-    rows = read_rows()
+    rows, fieldnames = read_table()
     if not rows:
         print(f"No {OUTPUT_CSV} yet - run the main scrape first.")
         return
@@ -676,80 +744,182 @@ def run_update(fetcher, quiet_pages=3):
     except KeyboardInterrupt:
         print("\nInterrupted; saving what we have.")
     finally:
-        write_rows(rows)
+        write_table(rows, fieldnames)
 
     print(f"\nUpdate finished. New: {new_count} | refreshed: {changed_count} | "
           f"total: {len(rows)}")
 
 
-def run_fill_published(fetcher):
-    rows = read_rows()
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def extract_published(html):
+    """Pull the ORIGINAL publication date out of a fic page.
+
+    AO3 writes it into the stats block as
+        <dt class="published">Published:</dt><dd class="published">2024-01-15</dd>
+    (work_meta_list, app/helpers/works_helper.rb). The Updated/Completed row
+    next to it is a *different* pair of elements (dt.status / dd.status), which
+    is exactly the distinction the listing page can't give us: a listing shows
+    only the revised date, never the original one.
+
+    Returns (published, status_label, status_date, dd_html).
+    """
+    soup = BeautifulSoup(html, PARSER)
+    meta = soup.select_one("dl.work.meta.group") or soup
+    stats = (meta.select_one("dd.stats dl.stats")
+             or meta.select_one("dl.stats") or meta)
+
+    dd = stats.select_one("dd.published")
+    published = dd.get_text(strip=True) if dd else ""
+
+    status_dt = stats.select_one("dt.status")
+    status_label = status_dt.get_text(strip=True).rstrip(":") if status_dt else ""
+    status_dd = stats.select_one("dd.status")
+    status_date = status_dd.get_text(strip=True) if status_dd else ""
+
+    return published, status_label, status_date, (str(dd) if dd else "")
+
+
+def run_fill_published(fetcher, csv_path=None, save_every=25,
+                       refresh_status=False, test_n=0):
+    """Fill `published` for every row that hasn't got one, from the fic page.
+
+    Only touches `published` (plus the status pair if you ask for it). Every
+    other column, including ones this script never produced, is written back
+    exactly as it was read.
+    """
+    path = csv_path or OUTPUT_CSV
+    rows, fieldnames = read_table(path)
     if not rows:
-        print(f"No {OUTPUT_CSV} yet - run the main scrape first.")
+        print(f"Can't read any rows from {path}.")
+        return
+    if "published" not in fieldnames:
+        print(f"{path} has no 'published' column. Found: {', '.join(fieldnames)}")
         return
 
-    pending = [r for r in rows if not r.get("published")]
-    print(f"{len(rows)} fics total; {len(pending)} need an exact publish date "
-          f"(the rest are single-chapter, already exact).\n")
+    pending = [r for r in rows if not (r.get("published") or "").strip()]
+    print(f"{path}: {len(rows)} rows, {len(pending)} without a publish date.")
+    print(f"Columns preserved as-is: {len(fieldnames)}")
     if not pending:
+        print("Nothing to do.")
         return
 
-    by_id = {r["work_id"]: r for r in rows}
-    filled = failed = 0
+    # ---- test mode: show a couple parsed, write nothing ----
+    if test_n:
+        sample = pending[:test_n]
+        print(f"\nTEST MODE - fetching {len(sample)} works, writing nothing.\n")
+        for r in sample:
+            url = fic_url(r)
+            print("=" * 66)
+            print(f"work_id   : {r.get('work_id', '')}")
+            print(f"url       : {url}")
+            if not url:
+                print("  ! row has neither url nor work_id; would be skipped")
+                continue
+            kind, resp = fetcher.get(url)
+            if kind != "ok":
+                print(f"  ! fetch failed ({kind})")
+                continue
+            published, label, sdate, dd_html = extract_published(resp.text)
+            soup = BeautifulSoup(resp.text, PARSER)
+            title = soup.select_one("h2.title.heading")
+            print(f"title     : {title.get_text(strip=True) if title else '?'}")
+            print(f"chapters  : {r.get('chapters', '')}")
+            print(f"raw <dd>  : {dd_html or '(dd.published NOT FOUND)'}")
+            print(f"-> published   : {published or '(empty)'}"
+                  f"{'' if DATE_RE.match(published or '') else '   <-- NOT YYYY-MM-DD'}")
+            print(f"   CSV had     : {(r.get('published') or '(empty)')}")
+            print(f"   page status : {label} {sdate}")
+            print(f"   CSV status  : {r.get('status_label', '')} {r.get('status_date', '')}")
+        print("=" * 66)
+        print("\nIf those look right, rerun without --test to do the full pass.")
+        return
+
+    # ---- full pass ----
+    backup_once(path)
+    filled = failed = skipped = 0
     consecutive_errors = 0
+    since_save = 0
+    t0 = time.monotonic()
 
     try:
         for i, r in enumerate(pending, 1):
-            wid = r["work_id"]
-            print(f"[{i}/{len(pending)}] fic {wid}...", end=" ", flush=True)
-            kind, resp = fetcher.get(
-                f"https://archiveofourown.org/works/{wid}?view_adult=true")
+            url = fic_url(r)
+            wid = r.get("work_id", "?")
+            print(f"[{i}/{len(pending)}] {wid}...", end=" ", flush=True)
+
+            if not url:
+                skipped += 1
+                print("no url/work_id -> skipped.")
+                continue
+
+            kind, resp = fetcher.get(url)
+
+            if kind in ("restricted", "notfound"):
+                # Permanent: no amount of retrying produces a date.
+                skipped += 1
+                consecutive_errors = 0
+                print(f"{kind} -> skipped.")
+                continue
+
             if kind != "ok":
+                # Server/network trouble. Leave the cell empty so the next run
+                # picks this row up again.
                 failed += 1
                 consecutive_errors += 1
-                print("failed -> stays pending.")
+                print("AO3 error -> stays pending.")
                 if consecutive_errors >= OUTAGE_THRESHOLD:
-                    print("\nAO3 looks down; stopping. Rerun to resume.")
+                    print(f"\n{OUTAGE_THRESHOLD} failures in a row - AO3 looks "
+                          f"down. Stopping cleanly; rerun to resume.")
                     break
                 continue
+
             consecutive_errors = 0
-            full = parse_work_page(wid, resp.text)
-            if full["published"]:
-                by_id[wid]["published"] = full["published"]
-                # The fic page is authoritative for these two as well.
-                by_id[wid]["status_label"] = full["status_label"]
-                by_id[wid]["status_date"] = full["status_date"]
-                filled += 1
-                print("ok.")
-            else:
+            published, label, sdate, _ = extract_published(resp.text)
+
+            if not published:
                 failed += 1
-                print("no date found.")
-            if i % 25 == 0:
-                write_rows(rows)
+                print("no dd.published on the page -> stays pending.")
+                continue
+            if not DATE_RE.match(published):
+                failed += 1
+                print(f"unexpected date format {published!r} -> stays pending.")
+                continue
+
+            r["published"] = published
+            if refresh_status:
+                if "status_label" in fieldnames:
+                    r["status_label"] = label
+                if "status_date" in fieldnames:
+                    r["status_date"] = sdate
+            filled += 1
+            since_save += 1
+            print(f"{published}")
+
+            if since_save >= save_every:
+                write_table(rows, fieldnames, path)
+                since_save = 0
+                print(f"  (saved - {filled} filled so far)")
     except KeyboardInterrupt:
         print("\nInterrupted; saving what we have.")
     finally:
-        write_rows(rows)
+        write_table(rows, fieldnames, path)
 
-    print(f"\nFilled: {filled} | still pending: {failed}")
-
-
-def write_rows(rows):
-    tmp = OUTPUT_CSV + ".tmp"
-    with open(tmp, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=FIELDS)
-        w.writeheader()
-        for r in rows:
-            w.writerow({k: r.get(k, "") for k in FIELDS})
-    os.replace(tmp, OUTPUT_CSV)
+    left = sum(1 for r in rows if not (r.get("published") or "").strip())
+    mins = (time.monotonic() - t0) / 60
+    print(f"\nDone in {mins:.1f} min. Filled: {filled} | "
+          f"errored (still pending): {failed} | skipped: {skipped}")
+    print(f"Rows still without a publish date: {left}")
+    if failed:
+        print("Errored rows were left empty on purpose - rerun the same "
+              "command and it picks up exactly those.")
 
 
 def run_verify(fetcher, sample_size):
     """Fetch a random sample of fic pages and diff them against what we parsed
     from the listing. This is how you prove the fast path is correct."""
-    import random
-
-    rows = read_rows()
+    rows, _ = read_table()
     if not rows:
         print(f"No {OUTPUT_CSV} yet - run the main scrape first.")
         return
@@ -800,17 +970,28 @@ def main():
                     help="visit only multi-chapter fics to get exact publish dates")
     ap.add_argument("--update", action="store_true",
                     help="top up an existing CSV with new/recently-updated fics")
+    ap.add_argument("--csv", metavar="PATH",
+                    help="operate on this CSV instead of <PROJECT_NAME>_metadata.csv")
+    ap.add_argument("--test", type=int, metavar="N", default=0,
+                    help="with --fill-published: fetch N works, print what was "
+                         "parsed, write nothing")
+    ap.add_argument("--save-every", type=int, default=25, metavar="N",
+                    help="with --fill-published: rewrite the CSV every N rows "
+                         "(default 25)")
+    ap.add_argument("--refresh-status", action="store_true",
+                    help="with --fill-published: also refresh status_label/"
+                         "status_date from the fic page (off by default)")
     ap.add_argument("--verify", type=int, metavar="N",
                     help="spot-check N scraped fics against their real fic pages")
     ap.add_argument("--tag-url", help="override TAG_URL")
     ap.add_argument("--project", help="override PROJECT_NAME")
     ap.add_argument("--email", help="override CONTACT_EMAIL")
     ap.add_argument("--delay", type=float,
-                    help="min seconds between requests (default 1.5)")
+                    help="min seconds between requests (default 1.2-2.5 random)")
     args = ap.parse_args()
 
     global TAG_URL, PROJECT_NAME, CONTACT_EMAIL, OUTPUT_CSV, PROGRESS_FILE
-    global USER_AGENT, MIN_SECONDS_BETWEEN_REQUESTS
+    global USER_AGENT, DELAY_MIN, DELAY_MAX
     if args.tag_url:
         TAG_URL = args.tag_url
     if args.project:
@@ -818,8 +999,9 @@ def main():
     if args.email:
         CONTACT_EMAIL = args.email
     if args.delay:
-        MIN_SECONDS_BETWEEN_REQUESTS = args.delay
-    OUTPUT_CSV = f"{PROJECT_NAME}_metadata.csv"
+        DELAY_MIN = args.delay
+        DELAY_MAX = max(args.delay * 1.6, args.delay + 0.5)
+    OUTPUT_CSV = args.csv or f"{PROJECT_NAME}_metadata.csv"
     PROGRESS_FILE = f"{PROJECT_NAME}_progress.txt"
     USER_AGENT = f"AO3 metadata (personal research) - contact: {CONTACT_EMAIL}"
 
@@ -831,13 +1013,17 @@ def main():
         return 1
 
     limiter = RateLimiter(MAX_REQUESTS_PER_WINDOW, WINDOW_SECONDS,
-                          MIN_SECONDS_BETWEEN_REQUESTS)
+                          DELAY_MIN, DELAY_MAX,
+                          LONG_REST_EVERY, LONG_REST_SECONDS)
     fetcher = Fetcher(limiter)
 
     if args.verify:
         run_verify(fetcher, args.verify)
     elif args.fill_published:
-        run_fill_published(fetcher)
+        run_fill_published(fetcher, csv_path=args.csv,
+                           save_every=args.save_every,
+                           refresh_status=args.refresh_status,
+                           test_n=args.test)
     elif args.update:
         run_update(fetcher)
     else:
