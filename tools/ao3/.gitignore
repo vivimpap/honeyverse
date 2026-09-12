@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*_metadata.csv
+*_progress.txt
+*_ids.csv
+*_skipped.csv
