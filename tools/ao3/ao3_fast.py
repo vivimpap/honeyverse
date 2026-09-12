@@ -38,23 +38,26 @@ Identical columns to the old Phase 2, in the same order, with the same ' ; '
 separator between values (semicolon, never |, because AO3 puts | *inside*
 individual tags: "Choi Taeyang | Theo"). Drop-in replacement for the old CSV.
 
-THE ONE FIELD THAT NEEDS A SECOND LOOK
---------------------------------------
-'published' is the only column not in the listing - blurbs show the *revised*
-date. For any fic with a single posted chapter those are the same date, so it's
-filled straight away. That's most fics. For the rest, run:
+THE ONE FIELD THE LISTING CAN'T GIVE YOU
+----------------------------------------
+'published' is the only column not in the listing pages - a blurb shows the
+*revised* date, not the original one. For a fic with a single posted chapter
+those are the same date, so it's filled from the listing; that's typically
+~75% of a fandom. The rest need one request each.
 
-    python3 ao3_fast.py --fill-published
-
-which visits only the multi-chapter fics (typically ~20-30% of a fandom).
-Skip it entirely if you only care about the updated date.
+So the plain run does both passes: it walks the listing pages, then visits
+just the multi-chapter fics to finish `published`. You end up with a complete
+column, which is what the two-script workflow this replaces produced. Pass
+--no-fill-published if you only care about the updated date and want to stop
+after the (much faster) listing pass.
 
 USAGE
 -----
     pip3 install requests beautifulsoup4        # lxml is optional but faster
     # edit the EDIT THESE block below, then:
-    python3 ao3_fast.py                         # main scrape (resumable)
-    python3 ao3_fast.py --fill-published        # optional exact publish dates
+    python3 ao3_fast.py                         # full scrape, complete CSV
+    python3 ao3_fast.py --no-fill-published     # listing pass only
+    python3 ao3_fast.py --fill-published        # just the publish-date pass
     python3 ao3_fast.py --update                # later: pull in new/changed fics
     python3 ao3_fast.py --verify 15             # sanity-check vs real fic pages
 
@@ -524,7 +527,7 @@ def run_scrape(fetcher):
               f"  - to pull in new/updated fics:  --update\n"
               f"  - to fill exact publish dates:  --fill-published\n"
               f"  - to scrape from scratch:       delete {PROGRESS_FILE}")
-        return
+        return False
 
     seen = load_done_ids()
     today = date.today()
@@ -544,6 +547,7 @@ def run_scrape(fetcher):
     consecutive_errors = 0
     stale_pages = 0
     completed = False
+    interrupted = False
     t0 = time.monotonic()
 
     try:
@@ -606,6 +610,7 @@ def run_scrape(fetcher):
         else:
             print(f"\nStopped at the {MAX_PAGE_SAFETY_LIMIT}-page safety limit.")
     except KeyboardInterrupt:
+        interrupted = True
         print("\nInterrupted. Rerun the same command to resume.")
     finally:
         out_f.close()
@@ -614,16 +619,13 @@ def run_scrape(fetcher):
                 f.write("done")
 
     mins = (time.monotonic() - t0) / 60
-    print(f"\nDone in {mins:.1f} min. New fics this run: {added_total}. "
-          f"Total: {len(seen)}.")
+    print(f"\nListing pass done in {mins:.1f} min. New fics this run: "
+          f"{added_total}. Total: {len(seen)}.")
     if approx_total:
         print(f"{approx_total} fics were updated in the last 30 days, so AO3 "
-              f"showed a relative date ('3 days'); those dates are "
-              f"day-accurate but derived. --fill-published makes them exact.")
-    missing = sum(1 for r in read_table()[0] if not r.get("published"))
-    if missing:
-        print(f"{missing} multi-chapter fics have no 'published' date yet. "
-              f"Run: python3 {os.path.basename(__file__)} --fill-published")
+              f"showed a relative date ('3 days') rather than a date; those are "
+              f"day-accurate but derived.")
+    return not interrupted
 
 
 def read_table(path=None):
@@ -978,6 +980,9 @@ def main():
     ap.add_argument("--save-every", type=int, default=25, metavar="N",
                     help="with --fill-published: rewrite the CSV every N rows "
                          "(default 25)")
+    ap.add_argument("--no-fill-published", action="store_true",
+                    help="stop after the listing pass, leaving `published` "
+                         "empty for multi-chapter fics")
     ap.add_argument("--refresh-status", action="store_true",
                     help="with --fill-published: also refresh status_label/"
                          "status_date from the fic page (off by default)")
@@ -1027,7 +1032,26 @@ def main():
     elif args.update:
         run_update(fetcher)
     else:
-        run_scrape(fetcher)
+        # The listing pages carry every column except `published`, which they
+        # only have for single-chapter fics. Leaving it half-empty would make
+        # this a worse drop-in replacement than the scripts it replaces, so the
+        # fill pass runs by default rather than waiting to be asked.
+        go_on = run_scrape(fetcher)
+        if go_on and not args.no_fill_published:
+            rows, _ = read_table()
+            missing = sum(1 for r in rows
+                          if not (r.get("published") or "").strip())
+            if missing:
+                print("\n" + "=" * 66)
+                print(f"Listing pages carry a publish date only for "
+                      f"single-chapter fics.\n{missing} multi-chapter fics "
+                      f"still need one, so fetching those now\n(~"
+                      f"{missing * (DELAY_MIN + DELAY_MAX) / 2 / 60:.0f} min). "
+                      f"Skip this next time with --no-fill-published.")
+                print("=" * 66 + "\n")
+                run_fill_published(fetcher, csv_path=OUTPUT_CSV,
+                                   save_every=args.save_every,
+                                   refresh_status=args.refresh_status)
     return 0
 
 

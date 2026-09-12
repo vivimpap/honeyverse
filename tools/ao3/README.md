@@ -33,11 +33,17 @@ The number only feeds the estimate above.
 pip3 install requests beautifulsoup4 lxml     # lxml optional, ~3x faster parsing
 
 # edit the EDIT THESE block at the top of ao3_fast.py, then:
-python3 ao3_fast.py                  # main scrape (resumable)
-python3 ao3_fast.py --fill-published # optional: exact publish dates
-python3 ao3_fast.py --verify 15      # spot-check against real fic pages
-python3 ao3_fast.py --update         # later: pull in new/changed fics
+python3 ao3_fast.py                      # full scrape -> complete CSV
+python3 ao3_fast.py --no-fill-published  # listing pass only (faster, gappy)
+python3 ao3_fast.py --verify 15          # spot-check against real fic pages
+python3 ao3_fast.py --update             # later: pull in new/changed fics
 ```
+
+A plain run does **both** passes and leaves `published` filled on every row.
+It walks the listing pages first, then visits only the multi-chapter fics to
+finish the one column listings can't supply. A multi-chapter fic ends up with
+*both* dates, which is correct: `published` = when it was first posted,
+`status_date` = when it was last updated.
 
 ### Filling `published` on a CSV you already have
 
@@ -88,8 +94,14 @@ expected chapter count is 1 — so those cells were blank before too.
 
 `published` is the only column not in the listing; blurbs carry the *revised*
 date. For a fic with **one posted chapter** those are the same date, so it's
-filled immediately — that's the majority of most fandoms. For the rest,
-`--fill-published` visits only those fics.
+filled from the listing — typically ~75% of a fandom. The rest cost one request
+each, which the plain run spends automatically so you get a complete column.
+
+The only rows that can end up without a date are multi-chapter fics that are
+restricted or deleted, where AO3 won't serve the page at all. Those are left
+**empty on purpose** rather than back-filled with the revised date, which would
+put a wrong date in your dataset. The run tells you how many, and rerunning
+retries the ones that failed for transient reasons.
 
 Everything else, including `status_label` and `status_date`, is derived exactly:
 `work_meta_list` only emits the status row when `expected_number_of_chapters != 1`,
@@ -123,7 +135,9 @@ deliberately does **not** mark the tag complete in that case, so a later
 The parser is tested against fixtures built from otwarchive's own templates:
 
 ```bash
-python3 test_parser.py
+python3 test_parser.py          # blurb parsing
+python3 test_fill_published.py  # publish-date pass, column preservation
+python3 test_end_to_end.py      # a plain run leaves no empty publish date
 ```
 
 To confirm against live AO3 — which the fixtures can't do — use `--verify N`.
