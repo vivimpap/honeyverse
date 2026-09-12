@@ -12,15 +12,19 @@ they list 25 fics per page.
 Three things were checked directly against [otwarchive](https://github.com/otwcode/otwarchive),
 AO3's own source, rather than assumed:
 
-| Claim | Where it's verified | Result |
+| Question | Where it's answered | What AO3 actually does |
 |---|---|---|
-| Listings truncate tags with "…" | `blurb_tag_block` (`app/helpers/tags_helper.rb`) | **False.** Every tag is written into the HTML. The "…" is CSS. |
-| Listings show 20 fics/page | `ITEMS_PER_PAGE` (`config/config.yml`) | It's **25**. |
-| 5–8 s between requests is required | `RATE_LIMIT_NUMBER` / `RATE_LIMIT_PERIOD` | Limit is **300 req / 300 s** = 1/sec. |
+| Does the listing truncate the tag list with "…"? | `blurb_tag_block` (`app/helpers/tags_helper.rb`) | **No.** Every relationship/character/freeform tag is written into the HTML. The "…" is CSS. |
+| How many fics does one listing page carry? | `ITEMS_PER_PAGE` (`config/config.yml`), resolved via `Search::Query#per_page` with no override in `works_controller` / `work_search_form` / `work_query` | **25.** So one request replaces 25. |
+| How fast may I request? | `RATE_LIMIT_NUMBER` / `RATE_LIMIT_PERIOD` (`config/config.yml`) | **300 requests / 300 seconds** = 1/sec. The old scripts' 5–8 s was ~6× stricter than required. |
 
 So: 25× fewer requests, each ~4× sooner. A 10,000-fic tag goes from roughly
 19 hours to about 10 minutes — and hits ~25× fewer 525s along the way, because
 a 525 is Cloudflare failing to reach AO3's origin, not your rate limit.
+
+The scraper doesn't hard-code 25 anywhere — it reads however many blurbs a page
+actually returns, and stops when AO3 says there's no next page. The number only
+feeds the estimate above, so nothing breaks if AO3 changes it.
 
 ## Usage
 
