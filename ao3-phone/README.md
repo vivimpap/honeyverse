@@ -1,0 +1,244 @@
+# Interactive phone for an AO3 fic
+
+A working phone UI your readers can tap through inside a fic — lock screen,
+home screen, apps, message threads, photos, notes, voicemail, and an app
+locked behind a 4-digit passcode they have to find clues for elsewhere in
+the phone.
+
+No JavaScript, because AO3 strips it out of works. No `id` attributes either
+— see below, that one is the whole trick.
+
+```
+src/workskin.css      the stylesheet you paste into AO3   ← edit this
+src/body.html         the markup you paste into the work  ← and this
+build.py              python3 build.py  → regenerates dist/
+ao3check.py           python3 ao3check.py → fails on anything AO3 would drop
+ao3sim.py             applies AO3's sanitizer, used by build.py
+
+dist/workskin.css     paste target 1
+dist/work-body.html   paste target 2 (one long line, on purpose)
+dist/preview.html     what you wrote
+dist/preview-ao3.html the same page after AO3's sanitizer has had it
+```
+
+Open **`dist/preview-ao3.html`**, not `preview.html`, when you want to know
+whether something will really work. It is the source markup with AO3's own
+attribute stripping and paragraph wrapping applied first, so it renders what
+the archive will actually serve.
+
+## How the navigation works
+
+AO3's HTML sanitizer allows exactly these attributes:
+
+```ruby
+attributes: { all: %w[align dir lang title], "a" => %w[href name], ... }   # + class
+```
+
+`id` is not on the list, on any element. So the obvious approach — hidden
+screens revealed by `:target` — cannot work on AO3: the archive deletes every
+`id`, `:target` then matches nothing, and you get a phone that renders
+perfectly and does absolutely nothing when tapped. (Selectors themselves are
+never sanitized, so it isn't `:target` that AO3 objects to. It's the anchor.)
+
+What AO3 does keep is `name` on `<a>`, its documented way to anchor within a
+work. So the phone is built as a **scrolling strip**:
+
+- `.vp` is a 290×580 window with `overflow: hidden`.
+- Each screen is a `.pane` inside it, exactly 580px tall, stacked vertically.
+- Each pane opens with `<p class="anc"><a name="msgs"></a></p>`, a zero-size
+  out-of-flow anchor pinned to the pane's top corner.
+- Every tap is `<a href="#msgs">`. Fragment navigation scrolls the window to
+  put that anchor's **top edge** at the window's top edge, which lands the
+  pane square in the window.
+
+No pseudo-classes, no ids, no scripts. The first pane in the markup is what
+readers see before they tap anything, which is why the lock screen comes
+first, and the browser's back button walks the history like a back gesture.
+
+### Class names need two characters
+
+The other rule that will bite you. AO3 validates every class name in a work:
+
+```ruby
+def valid_class?(str)
+  str =~ /^[a-zA-Z][\w\-]+$/      # a letter, then ONE OR MORE more chars
+end
+```
+
+Note the `+`. A one-character class is thrown away, so `class="b them"` is
+posted as `class="them"` — and because the skin still has its `.b` rule,
+nothing errors anywhere. It just silently stops applying. That is how the
+message bubbles arrived on the archive with their colour and alignment
+intact but no padding, no `inline-block` and no `border-radius`. The bubble
+class is `.bub` for that reason, and the keypad's is `.key`.
+
+So: **every class in this skin is at least two characters long, and starts
+with a letter.** `ao3check.py` enforces it on both the markup and the
+stylesheet.
+
+### Two more things the archive does
+
+Both harmless, but worth knowing when something looks 18 pixels off:
+
+- It wraps every run of loose inline tags in a `<p>` of its own — about 170
+  paragraphs get injected into this phone. Hence `.phone p{margin:0}`, and
+  hence the `<p class="anc">` wrapper: a bare `<a>` would get wrapped in a
+  paragraph AO3 owns and you cannot style.
+- It adds `rel="nofollow"` to every link.
+
+## Posting it on AO3
+
+1. **Make the work skin.** Dashboard → Skins → My Work Skins → *Create Work
+   Skin*. Give it a title, paste all of `dist/workskin.css` into the CSS box,
+   Submit. AO3 prefixes every rule with `#workskin` itself — don't add it.
+   If AO3 rejects a line, delete that line; nothing in the skin is
+   load-bearing on its own. (`python3 ao3check.py` should catch these first.)
+2. **Post the work.** In the work form, click the **HTML** tab above the
+   text box first (not Rich Text), then paste `dist/work-body.html`.
+3. **Attach the skin.** Further down the work form, *Select Work Skin* →
+   pick the skin you made.
+4. Preview, and tap around.
+
+`dist/work-body.html` is deliberately one long line. AO3 converts stray line
+breaks inside a work into `<br>` tags, which would shove the phone apart —
+that's what `build.py` strips out.
+
+### Two things to know about readers
+
+- Anyone can turn work skins off, and the AO3 app and EPUB downloads ignore
+  them. Those readers see every screen stacked as plain text, in pane order —
+  readable, just not a phone. Order your panes so that fallback still reads
+  like a story, and consider putting a plain-text transcript in the end notes.
+- A tap scrolls the phone to the top of the window, so the phone jumps into
+  place. That's normal for this kind of fic and readers are used to it.
+- If you put **two** phones in one work (or one per chapter in a single-page
+  "Entire Work" view), every anchor name has to be unique. Suffix them:
+  `<a name="home2">`, `href="#home2"`, and so on.
+
+## Making it yours
+
+Edit `src/`, run `python3 build.py`, check `python3 ao3check.py`, repaste.
+Or edit `dist/` by hand if you don't want to run anything.
+
+**A new message.** One line, inside a thread's `.bd`:
+
+```html
+<div class="row"><span class="b them">what they said</span></div>
+<div class="row"><span class="b me">what you said</span></div>
+<div class="ts">Sunday 3:04 AM</div>          <!-- timestamp divider -->
+<div class="rd">Read 3:05 AM</div>            <!-- read receipt -->
+<div class="row"><span class="b typing">&bull;&bull;&bull;</span></div>
+```
+
+**A new screen.** Copy a whole `<div class="pane">` block, give its anchor a
+new name, and link to it from somewhere:
+
+```html
+<div class="pane"><p class="anc"><a name="your-new-screen"></a></p>
+  <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Title</span></div>
+  <div class="bd"> ... </div>
+</div>
+```
+
+Keep it a direct child of `.vp`, alongside the other panes, and don't nest
+panes — the strip only works because every pane is the same height.
+
+**Renaming Glimpse.** The photo-sharing app is deliberately fictional. Its
+name appears in exactly four places: the `.lb` label on the home screen and
+the `.ti` in the three pane headers (`#glimpse`, `#gpost`, `#gprof`).
+
+**A new app icon.** Add to `.apps` on the home pane:
+
+```html
+<a class="app" href="#your-screen"><span class="ic g5">&#9834;</span><span class="lb">Label</span></a>
+```
+
+`g1`–`g9` are the icon colours (plus `gglim` and `glock`); add `<span class="bdg">2</span>` inside the
+`.ic` for an unread badge. Icons are text characters (`&#9993;` and friends)
+so they need no image hosting.
+
+**The passcode** is `0419`. Four panes, `#pc1` → `#pc4`: on each one, the
+correct digit links to the next pane and all nine others link to `#pcx`
+("Passcode Incorrect"). To change it to, say, `7812`, move the forward link
+to `7` on `#pc1`, `8` on `#pc2`, `1` on `#pc3`, `2` on `#pc4` — and plant the
+new clue somewhere (right now the date is in a note, a photo caption, and the
+unknown number's last four digits).
+
+## Real photographs in the gallery
+
+Yes. AO3 allows `<img>` in a work from any http/https host, and images show
+up even for readers who have work skins turned off, which the coloured
+placeholder tiles do not. Drop an `<img>` inside a tile and remove its
+colour class:
+
+```html
+<a class="ph" href="#ph1"><img src="https://your-host.example/pic.jpg" alt="a rooftop at 2am"/></a>
+```
+
+Same inside `.big` on a photo detail screen, or inside `.pshot` for a post
+in Glimpse. The skin centre-crops whatever you give it, so any aspect ratio
+works — AO3 has no `object-fit`, so `.ph img` does it the old way, letting
+the image overflow on its long axis and pulling it back by half its own
+width and height. Square-ish crops waste the least of the picture.
+
+Sizes, so you know what to export: gallery tiles are 84×84, photo details
+250×250, Glimpse posts 290×250. Nothing needs to be wider than about 600px.
+
+What to watch for:
+
+- **AO3 does not host images.** You need them somewhere else and you link to
+  them. Any host that allows hotlinking over https works — imgbox,
+  postimages, ImgBB, a Dreamwidth scrapbook, your own site, GitHub Pages.
+  Avoid Discord CDN links (they expire) and Google Photos or Drive share
+  links (they aren't direct image URLs).
+- **Only these attributes survive** on an `<img>`: `align alt border height
+  src width`, plus `class`. No `style`, no `srcset`, no `loading`.
+- **Relative paths don't work** — AO3 rewrites them against its own domain.
+  Always a full `https://` URL.
+- Write real `alt` text. It's the only description a screen-reader gets, and
+  it's the fallback when a host goes down mid-fic.
+
+A work skin may also use `background-image: url(https://…)`, but the archive
+only accepts a URL that ends in `.jpg`, `.jpeg`, `.png` or `.gif` with no
+query string, which rules out a lot of CDN links. `<img>` is the easier road.
+
+**Colours.** The screen background is `#101218`, incoming bubbles `#262b37`,
+outgoing `#2f6df6`, the wallpaper is the gradient on `.wall` and `.lockpane`.
+Every gradient has a flat colour declared right before it, so if AO3 ever
+strips the gradient the phone just goes solid.
+
+## What the checker knows
+
+`ao3check.py` holds AO3's real whitelists, transcribed from the archive's
+source, and fails the build on anything the archive would drop:
+
+| what | where it comes from |
+| --- | --- |
+| allowed elements and attributes | `config/initializers/gem-plugin_config/sanitizer_config.rb` |
+| valid class names | `lib/otw_sanitize/user_class_sanitizer.rb` |
+| allowed CSS properties | `config/config.yml` — `SUPPORTED_CSS_PROPERTIES` |
+| allowed CSS values | `lib/css_cleaner.rb` |
+| paragraph wrapping | `lib/paragraph_maker.rb` |
+
+Worth re-running if you add anything: `display: grid`, `gap`, `calc()`,
+custom properties and any one-character class all look fine locally and all
+vanish on the archive.
+
+## What's on the home screen
+
+Twelve apps. Messages (five threads), Phone (recents and a voicemail
+transcript), Photos, Notes, Mail, Browser (search history), Camera, Music,
+**Glimpse** — a photo-sharing app with a feed, a post and its comment
+thread, and a profile — Calendar, Settings, and one app behind a passcode.
+
+There is no status bar. It sat above every screen at `z-index: 20`, so a
+22px strip along the top of the phone quietly swallowed taps meant for the
+back arrow underneath it. The screens start at the top edge instead, and
+the back arrow is a full-height target now.
+
+## The demo story in it
+
+Placeholder content — swap the names out. A narrator with a 2:14 AM problem:
+Wren has a photo, an unknown number has a deadline, Mom left a voicemail
+about an anniversary, building management has stairwell footage, and the
+thread that explains all of it is behind the passcode.
