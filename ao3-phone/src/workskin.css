@@ -8,30 +8,42 @@
    If AO3 rejects a line when you hit Submit, just delete that line.
    Everything here degrades: colours, shadows and gradients are decoration,
    the layout survives without them.
+
+   How the navigation works, because AO3 constrains it: the archive strips
+   the id attribute off every element in a work, so screens cannot be
+   :target overlays. Instead .vp is a 580px window with overflow hidden,
+   and the screens are 580px-tall panes stacked inside it. Tapping a link
+   to a named anchor makes the browser scroll that window to the pane —
+   fragment navigation aligns the target's top edge, so a pane always
+   lands square in the window. No pseudo-classes, no ids, no scripts.
    ===================================================================== */
 
 /* ---------- frame ---------- */
 .phone-wrap{text-align:center;margin:1.6em 0}
-.phone{display:inline-block;text-align:left;width:290px;padding:9px;border:1px solid #2b2b33;border-radius:40px;background-color:#08080a;box-shadow:0 16px 38px rgba(0,0,0,.45)}
+.phone{position:relative;display:inline-block;text-align:left;width:290px;padding:9px;border:1px solid #2b2b33;border-radius:40px;background-color:#08080a;box-shadow:0 16px 38px rgba(0,0,0,.45)}
 .vp{position:relative;height:580px;overflow:hidden;border-radius:32px;background-color:#101218;color:#f1f3f8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.4}
 .vp a{color:inherit;text-decoration:none;border:0}
 .vp a:hover{text-decoration:none;color:inherit}
-.vp p{margin:0;text-indent:0}
+.phone p{margin:0;text-indent:0}   /* AO3 wraps loose inline tags in <p> */
 .vp img{max-width:100%}
 .hint{max-width:430px;margin:.7em auto 0;text-align:center;font-size:.85em;font-style:italic;opacity:.75}
 
 /* ---------- screens ----------
-   Every screen is hidden until its id is the one in the URL (:target).
-   The lock screen sits underneath them all, so it is what you see first. */
-.scr{position:absolute;top:0;left:0;width:290px;height:580px;display:none;z-index:5;overflow:hidden;background-color:#101218}
-.scr:target{display:block}
-.lockscr{position:absolute;top:0;left:0;width:290px;height:580px;z-index:2;background-color:#1a2133;background-image:linear-gradient(165deg,#1d2740,#2d1f33 58%,#3b2434)}
+   One pane per screen, stacked down the inside of the window. Each is
+   exactly as tall as the window, so whichever one the browser scrolls to
+   fills it completely. The first pane in the markup is what readers see
+   before they tap anything, which is why the lock screen comes first.
+   .anc is the scroll target: no size, out of flow, but still rendered —
+   display:none or visibility:hidden would make it unscrollable-to. */
+.pane{position:relative;width:290px;height:580px;overflow:hidden;background-color:#101218}
+.anc{position:absolute;top:0;left:0;width:0;height:0;margin:0;overflow:hidden}
+.lockpane{background-color:#1a2133;background-image:linear-gradient(165deg,#1d2740,#2d1f33 58%,#3b2434)}
 
 /* ---------- chrome ---------- */
-.sb{position:absolute;top:0;left:0;right:0;height:22px;line-height:22px;font-size:10px;color:#d6dae6;z-index:20}
+.sb{position:absolute;top:9px;left:9px;right:9px;height:22px;line-height:22px;font-size:10px;color:#d6dae6;z-index:20}
 .sb b{position:absolute;left:16px;top:0;font-weight:600}
 .sb i{position:absolute;right:14px;top:0;font-style:normal;letter-spacing:1px}
-.hi{position:absolute;left:100px;bottom:6px;width:90px;height:4px;border-radius:2px;background-color:#7b8196;z-index:20}
+.hi{position:absolute;left:109px;bottom:15px;width:90px;height:4px;border-radius:2px;background-color:#7b8196;z-index:20}
 
 .hd{position:absolute;top:22px;left:0;right:0;height:42px;line-height:42px;z-index:9;background-color:#171b24;border-bottom:1px solid #242936}
 .hd .ti{display:block;text-align:center;font-size:13px;font-weight:600;color:#fff}

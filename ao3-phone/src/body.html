@@ -1,5 +1,12 @@
 <!-- =====================================================================
      INTERACTIVE PHONE — WORK BODY
+     ---------------------------------------------------------------------
+     Navigation note: AO3 strips the id attribute off every element, so the
+     screens are NOT :target overlays. Each screen is a 580px-tall pane in
+     a vertical strip inside a 580px window, and every tap is a link to an
+     anchor at the top of a pane — the browser scrolls the window to it,
+     because fragment navigation aligns the target's top edge. A named
+     anchor is the one anchoring mechanism AO3 keeps.
      Paste the built version (dist/work-body.html) into the AO3 work text
      box with the HTML editor tab selected, and attach the work skin.
      Comments and line breaks are stripped by build.py because AO3 turns
@@ -9,12 +16,8 @@
 <div class="phone">
 <div class="vp">
 
-  <!-- status bar + home bar: drawn once, float above every screen -->
-  <div class="sb"><b>2:14</b><i>&#9601;&#9603;&#9605; 5G &#9646;</i></div>
-  <div class="hi"></div>
-
   <!-- ============ LOCK SCREEN (what the reader sees first) ============ -->
-  <div class="lockscr">
+  <div class="pane lockpane"><p class="anc"><a name="lock"></a></p>
     <div class="lk-t">2:14</div>
     <div class="lk-d">Sunday, 19 April</div>
     <a class="lk-n" href="#t-wren"><em>now</em><b>Messages &middot; Wren</b><span>are you awake</span></a>
@@ -24,7 +27,7 @@
   </div>
 
   <!-- ============ HOME ============ -->
-  <div class="scr wall" id="home">
+  <div class="pane wall"><p class="anc"><a name="home"></a></p>
     <div class="apps">
       <a class="app" href="#msgs"><span class="ic g1">&#9993;<span class="bdg">3</span></span><span class="lb">Messages</span></a>
       <a class="app" href="#calls"><span class="ic g6">&#9742;<span class="bdg">2</span></span><span class="lb">Phone</span></a>
@@ -47,7 +50,7 @@
   </div>
 
   <!-- ============ MESSAGES — conversation list ============ -->
-  <div class="scr" id="msgs">
+  <div class="pane"><p class="anc"><a name="msgs"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Messages</span><span class="ac">Edit</span></div>
     <div class="bd flush">
       <a class="rw" href="#t-wren"><span class="av g2">W</span><span class="nm">Wren</span><span class="pv">are you awake</span><span class="tm">2:11 am</span><span class="un"></span></a>
@@ -59,7 +62,7 @@
   </div>
 
   <!-- ============ THREAD — Wren ============ -->
-  <div class="scr" id="t-wren">
+  <div class="pane"><p class="anc"><a name="t-wren"></a></p>
     <div class="hd"><a class="bk" href="#msgs">&#8249; Messages</a><span class="ti two">Wren</span><span class="sub">last seen 2:12 am</span><a class="ac" href="#calls">call</a></div>
     <div class="bd hasinp">
       <div class="ts">Saturday 11:40 PM</div>
@@ -83,7 +86,7 @@
   </div>
 
   <!-- ============ THREAD — Unknown ============ -->
-  <div class="scr" id="t-unk">
+  <div class="pane"><p class="anc"><a name="t-unk"></a></p>
     <div class="hd"><a class="bk" href="#msgs">&#8249; Messages</a><span class="ti two">Unknown Number</span><span class="sub">+82 10 &bull;&bull;&bull;&bull; 0419</span></div>
     <div class="bd hasinp">
       <div class="ts">Sunday 12:58 AM</div>
@@ -99,7 +102,7 @@
   </div>
 
   <!-- ============ THREAD — group chat ============ -->
-  <div class="scr" id="t-grp">
+  <div class="pane"><p class="anc"><a name="t-grp"></a></p>
     <div class="hd"><a class="bk" href="#msgs">&#8249; Messages</a><span class="ti two">seven of us &#128220;</span><span class="sub">7 people</span></div>
     <div class="bd hasinp">
       <div class="ts">Saturday 11:31 PM</div>
@@ -118,7 +121,7 @@
   </div>
 
   <!-- ============ THREAD — Mom ============ -->
-  <div class="scr" id="t-mom">
+  <div class="pane"><p class="anc"><a name="t-mom"></a></p>
     <div class="hd"><a class="bk" href="#msgs">&#8249; Messages</a><span class="ti">Mom</span><a class="ac" href="#calls">call</a></div>
     <div class="bd hasinp">
       <div class="ts">Yesterday 6:12 PM</div>
@@ -134,7 +137,7 @@
   </div>
 
   <!-- ============ THREAD — Sol (the polite one) ============ -->
-  <div class="scr" id="t-sol">
+  <div class="pane"><p class="anc"><a name="t-sol"></a></p>
     <div class="hd"><a class="bk" href="#msgs">&#8249; Messages</a><span class="ti two">Sol</span><span class="sub">work</span></div>
     <div class="bd hasinp">
       <div class="ts">Friday 4:40 PM</div>
@@ -150,7 +153,7 @@
   </div>
 
   <!-- ============ PHONE / CALLS ============ -->
-  <div class="scr" id="calls">
+  <div class="pane"><p class="anc"><a name="calls"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Recents</span><span class="ac">All</span></div>
     <div class="bd flush">
       <div class="sec">Today</div>
@@ -166,7 +169,7 @@
   </div>
 
   <!-- ============ VOICEMAIL ============ -->
-  <div class="scr" id="vm">
+  <div class="pane"><p class="anc"><a name="vm"></a></p>
     <div class="hd"><a class="bk" href="#calls">&#8249; Recents</a><span class="ti two">Voicemail</span><span class="sub">Mom &middot; 11:02 pm &middot; 0:34</span></div>
     <div class="bd">
       <div class="note">
@@ -179,7 +182,7 @@
   </div>
 
   <!-- ============ PHOTOS ============ -->
-  <div class="scr" id="photos">
+  <div class="pane"><p class="anc"><a name="photos"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Recents</span><span class="ac">Select</span></div>
     <div class="bd flush">
       <div class="grid">
@@ -189,21 +192,21 @@
       </div>
     </div>
   </div>
-  <div class="scr" id="ph1">
+  <div class="pane"><p class="anc"><a name="ph1"></a></p>
     <div class="hd"><a class="bk" href="#photos">&#8249; Photos</a><span class="ti two">19 April</span><span class="sub">2:06 AM &middot; Rooftop</span></div>
     <div class="bd"><span class="big pa"></span><div class="cap">Two coffee cups on a ledge. Only one of them has lipstick on it. The city is doing that thing it does at two in the morning where it looks like it is holding its breath.</div></div>
   </div>
-  <div class="scr" id="ph2">
+  <div class="pane"><p class="anc"><a name="ph2"></a></p>
     <div class="hd"><a class="bk" href="#photos">&#8249; Photos</a><span class="ti two">19 April</span><span class="sub">1:44 AM &middot; Hidden album</span></div>
     <div class="bd"><span class="big pb"></span><div class="cap">Blurry. Two hands on a stair rail, one over the other. Whoever took it was moving. Whoever took it was not supposed to be there.</div></div>
   </div>
-  <div class="scr" id="ph3">
+  <div class="pane"><p class="anc"><a name="ph3"></a></p>
     <div class="hd"><a class="bk" href="#photos">&#8249; Photos</a><span class="ti two">Screenshot</span><span class="sub">Saved 1:11 AM</span></div>
     <div class="bd"><span class="big pc"></span><div class="cap">A screenshot of a message thread that has since been deleted. The only line still legible: <b>&ldquo;he already knows, you know.&rdquo;</b></div></div>
   </div>
 
   <!-- ============ NOTES ============ -->
-  <div class="scr" id="notes">
+  <div class="pane"><p class="anc"><a name="notes"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Notes</span><span class="ac">New</span></div>
     <div class="bd flush">
       <a class="rw" href="#nt1"><span class="av g4">&#9998;</span><span class="nm">things i can&rsquo;t say out loud</span><span class="pv">1. that i still drive past the old</span><span class="tm">2:09 am</span></a>
@@ -211,7 +214,7 @@
       <a class="rw" href="#nt3"><span class="av g4">&#9998;</span><span class="nm">groceries</span><span class="pv">eggs, rice, the good soy sauce, ap</span><span class="tm">Friday</span></a>
     </div>
   </div>
-  <div class="scr" id="nt1">
+  <div class="pane"><p class="anc"><a name="nt1"></a></p>
     <div class="hd"><a class="bk" href="#notes">&#8249; Notes</a><span class="ti two">Note</span><span class="sub">Edited 2:09 am</span></div>
     <div class="bd"><div class="note">
       <h4>things i can&rsquo;t say out loud</h4>
@@ -223,7 +226,7 @@
       <p>5. that i would do all of it again</p>
     </div></div>
   </div>
-  <div class="scr" id="nt2">
+  <div class="pane"><p class="anc"><a name="nt2"></a></p>
     <div class="hd"><a class="bk" href="#notes">&#8249; Notes</a><span class="ti two">Note</span><span class="sub">Edited 1:31 am</span></div>
     <div class="bd"><div class="note">
       <h4>draft &mdash; do not send</h4>
@@ -234,7 +237,7 @@
       <p class="sig">&mdash; unsent</p>
     </div></div>
   </div>
-  <div class="scr" id="nt3">
+  <div class="pane"><p class="anc"><a name="nt3"></a></p>
     <div class="hd"><a class="bk" href="#notes">&#8249; Notes</a><span class="ti two">Note</span><span class="sub">Edited Friday</span></div>
     <div class="bd"><div class="note">
       <h4>groceries</h4>
@@ -245,7 +248,7 @@
   </div>
 
   <!-- ============ MAIL ============ -->
-  <div class="scr" id="mail">
+  <div class="pane"><p class="anc"><a name="mail"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Inbox</span><span class="ac">Edit</span></div>
     <div class="bd flush">
       <a class="rw" href="#ml1"><span class="av g8">!</span><span class="nm">building management</span><span class="pv">Re: Roof access &mdash; 19 April, 01:40</span><span class="tm">6:02 am</span><span class="un"></span></a>
@@ -253,7 +256,7 @@
       <a class="rw" href="#ml1"><span class="av g7">N</span><span class="nm">no-reply</span><span class="pv">Your monthly statement is ready</span><span class="tm">Thursday</span></a>
     </div>
   </div>
-  <div class="scr" id="ml1">
+  <div class="pane"><p class="anc"><a name="ml1"></a></p>
     <div class="hd"><a class="bk" href="#mail">&#8249; Inbox</a><span class="ti">Re: Roof access</span></div>
     <div class="bd">
       <div class="mlhd"><b>building management</b><span>to: me &middot; 6:02 AM</span></div>
@@ -267,7 +270,7 @@
   </div>
 
   <!-- ============ BROWSER ============ -->
-  <div class="scr" id="web">
+  <div class="pane"><p class="anc"><a name="web"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">History</span><span class="ac">Clear</span></div>
     <div class="bd flush">
       <div class="sec">Last night</div>
@@ -281,7 +284,7 @@
   </div>
 
   <!-- ============ MUSIC ============ -->
-  <div class="scr" id="music">
+  <div class="pane"><p class="anc"><a name="music"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Now Playing</span></div>
     <div class="bd">
       <span class="big pd"></span>
@@ -290,7 +293,7 @@
   </div>
 
   <!-- ============ CALENDAR ============ -->
-  <div class="scr" id="cal">
+  <div class="pane"><p class="anc"><a name="cal"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti two">April</span><span class="sub">Sunday 19</span></div>
     <div class="bd flush">
       <div class="sec">Today</div>
@@ -302,16 +305,17 @@
   </div>
 
   <!-- ============ SETTINGS ============ -->
-  <div class="scr" id="settings">
+  <div class="pane"><p class="anc"><a name="settings"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Settings</span></div>
     <div class="bd flush">
       <a class="rw" href="#settings"><span class="av g7">&#9992;</span><span class="nm">Airplane Mode</span><span class="pv">Off</span></a>
       <a class="rw" href="#settings"><span class="av g2">&#9729;</span><span class="nm">Wi-Fi</span><span class="pv">not connected</span></a>
       <a class="rw" href="#pc1"><span class="av glock">&#8856;</span><span class="nm">Face ID &amp; Passcode</span><span class="pv">Passcode required immediately</span></a>
+      <a class="rw" href="#lock"><span class="av g7">&#9099;</span><span class="nm">Lock Now</span><span class="pv">Return to the lock screen</span></a>
       <a class="rw" href="#about"><span class="av g7">i</span><span class="nm">About</span><span class="pv">This phone</span></a>
     </div>
   </div>
-  <div class="scr" id="about">
+  <div class="pane"><p class="anc"><a name="about"></a></p>
     <div class="hd"><a class="bk" href="#settings">&#8249; Settings</a><span class="ti">About</span></div>
     <div class="bd"><div class="note">
       <h4>This phone</h4>
@@ -325,7 +329,7 @@
        Each keypad screen sends the correct digit to the next screen and
        every other digit to #pcx. Change the code by moving which digit
        links forward on each of the four screens. -->
-  <div class="scr" id="pc1">
+  <div class="pane"><p class="anc"><a name="pc1"></a></p>
     <div class="pctitle">Enter Passcode</div>
     <div class="pcsub">Locked &middot; 4 digits</div>
     <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
@@ -337,7 +341,7 @@
     </div>
     <a class="lk-u" href="#home">Cancel</a>
   </div>
-  <div class="scr" id="pc2">
+  <div class="pane"><p class="anc"><a name="pc2"></a></p>
     <div class="pctitle">Enter Passcode</div>
     <div class="pcsub">Locked &middot; 4 digits</div>
     <div class="dots"><span class="dot on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
@@ -349,7 +353,7 @@
     </div>
     <a class="lk-u" href="#home">Cancel</a>
   </div>
-  <div class="scr" id="pc3">
+  <div class="pane"><p class="anc"><a name="pc3"></a></p>
     <div class="pctitle">Enter Passcode</div>
     <div class="pcsub">Locked &middot; 4 digits</div>
     <div class="dots"><span class="dot on"></span><span class="dot on"></span><span class="dot"></span><span class="dot"></span></div>
@@ -361,7 +365,7 @@
     </div>
     <a class="lk-u" href="#home">Cancel</a>
   </div>
-  <div class="scr" id="pc4">
+  <div class="pane"><p class="anc"><a name="pc4"></a></p>
     <div class="pctitle">Enter Passcode</div>
     <div class="pcsub">Locked &middot; 4 digits</div>
     <div class="dots"><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot"></span></div>
@@ -373,7 +377,7 @@
     </div>
     <a class="lk-u" href="#home">Cancel</a>
   </div>
-  <div class="scr" id="pcx">
+  <div class="pane"><p class="anc"><a name="pcx"></a></p>
     <div class="wrong">
       <b>Passcode Incorrect</b>
       <span>4 attempts remaining. The date is somewhere in this phone &mdash; it always has been.</span>
@@ -383,7 +387,7 @@
   </div>
 
   <!-- ============ VAULT — the real thread ============ -->
-  <div class="scr" id="vault">
+  <div class="pane"><p class="anc"><a name="vault"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti two">Sol</span><span class="sub">hidden &middot; unlocked</span></div>
     <div class="bd hasinp">
       <div class="ts">Saturday 9:54 PM</div>
@@ -405,6 +409,10 @@
   </div>
 
 </div>
+  <!-- status bar + home bar: siblings of the scrolling window, so they
+       stay put while the screens move underneath them -->
+  <div class="sb"><b>2:14</b><i>&#9601;&#9603;&#9605; 5G &#9646;</i></div>
+  <div class="hi"></div>
 </div>
 <p class="hint">Tap the screen to move around. &#8249; goes back, and your browser&rsquo;s back button works too. Something in here is locked.</p>
 </div>
