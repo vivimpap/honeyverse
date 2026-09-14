@@ -4,16 +4,19 @@ what the archive renders rather than what we wrote.
 
 Transcribed from the archive's source:
   attribute stripping  config/initializers/gem-plugin_config/sanitizer_config.rb
+  class validation     lib/otw_sanitize/user_class_sanitizer.rb
   paragraph wrapping   lib/paragraph_maker.rb  (wrap_all)
 
-The second one is the surprising half: AO3 wraps any run of loose inline
-children in a <p> of its own, so markup that never mentions <p> still comes
-back with paragraphs in it.
+Two of those are easy to get wrong. AO3 wraps any run of loose inline
+children in a <p> of its own, so markup that never mentions <p> comes back
+with paragraphs in it. And a class name must match /^[a-zA-Z][\w\-]+$/ --
+note the + -- so every single-character class is thrown away.
 """
 import re
 from html.parser import HTMLParser
 
 VOID = {"br", "hr", "img", "col"}
+VALID_CLASS = re.compile(r"^[a-zA-Z][\w\-]+$")
 ATTRS_ALL = {"align", "dir", "lang", "title", "class"}
 ATTRS_BY_TAG = {
     "a": {"href", "name"}, "blockquote": {"cite"}, "col": {"span", "width"},
@@ -45,7 +48,14 @@ class Tree(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         allowed = ATTRS_ALL | ATTRS_BY_TAG.get(tag, set())
-        node = Node(tag, [(k, v) for k, v in attrs if k in allowed])
+        kept = []
+        for k, v in attrs:
+            if k not in allowed:
+                continue
+            if k == "class" and v:
+                v = " ".join(c for c in v.split() if VALID_CLASS.match(c))
+            kept.append((k, v))
+        node = Node(tag, kept)
         self.stack[-1].kids.append(node)
         if tag not in VOID:
             self.stack.append(node)

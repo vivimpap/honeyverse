@@ -9,11 +9,18 @@ shows up as "the phone renders but nothing happens" rather than an error.
 The lists below are transcribed from the archive's own source:
 
   elements / attributes  otwarchive config/initializers/gem-plugin_config/sanitizer_config.rb
+  class names            otwarchive lib/otw_sanitize/user_class_sanitizer.rb
   CSS properties         otwarchive config/config.yml (SUPPORTED_CSS_PROPERTIES)
   CSS values             otwarchive lib/css_cleaner.rb
 
-Note in particular that `id` is not an allowed attribute on anything, which
-is why this phone navigates with <a name=""> anchors instead of :target.
+Two rules here have already cost a posting cycle each:
+
+  `id` is not an allowed attribute on anything, which is why this phone
+  navigates with <a name=""> anchors instead of :target; and
+
+  a class name must match /^[a-zA-Z][\w\-]+$/ -- note the + -- so a
+  single-character class like `class="b"` is dropped from the posted work
+  while the skin rule for it stays behind, styling nothing.
 """
 import re, sys, pathlib
 
@@ -21,6 +28,8 @@ ELEMENTS = set("""a abbr acronym address b big blockquote br caption center cite
 colgroup details figcaption figure dd del dfn div dl dt em h1 h2 h3 h4 h5 h6 hr
 i img ins kbd li ol p pre q rp rt ruby s samp small span strike strong
 sub summary sup table tbody td tfoot th thead tr tt u ul var""".split())
+
+VALID_CLASS = re.compile(r"^[a-zA-Z][\w\-]+$")
 
 ATTRS_ALL = {"align", "dir", "lang", "title", "class"}
 ATTRS_BY_TAG = {
@@ -89,11 +98,28 @@ def check_html(path):
         for attr in re.findall(r"\s+([a-z\-]+)=", attrs, re.I):
             if attr.lower() not in allowed:
                 bad.append("attribute stripped by AO3: %s on <%s>" % (attr.lower(), tag))
+    for attr in re.findall(r'class="([^"]*)"', html):
+        for name in attr.split():
+            if not VALID_CLASS.match(name):
+                bad.append("class stripped by AO3 (needs 2+ chars, "
+                           "must start with a letter): %s" % name)
+    return bad
+
+
+def check_selectors(path):
+    """A skin rule for a class AO3 strips is dead weight — flag it too."""
+    bad = []
+    css = re.sub(r"/\*.*?\*/", "", path.read_text(), flags=re.S)
+    css = re.sub(r"\{[^}]*\}", " ", css)          # selectors only, no values
+    for name in set(re.findall(r"\.([A-Za-z_][\w\-]*)", css)):
+        if not VALID_CLASS.match(name):
+            bad.append("selector can never match, AO3 strips this class: .%s" % name)
     return bad
 
 here = pathlib.Path(__file__).parent
 problems = []
 problems += ["workskin.css: " + b for b in check_css(here / "dist" / "workskin.css")]
+problems += ["workskin.css: " + b for b in check_selectors(here / "dist" / "workskin.css")]
 problems += ["work-body.html: " + b for b in check_html(here / "dist" / "work-body.html")]
 
 seen, unique = set(), []

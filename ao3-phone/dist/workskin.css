@@ -95,9 +95,12 @@
 .un{position:absolute;right:9px;top:31px;width:9px;height:9px;border-radius:5px;background-color:#3478f6}
 .sec{padding:14px 12px 5px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#7b839a}
 
-/* ---------- message bubbles ---------- */
+/* ---------- message bubbles ----------
+   Class names are at least two characters long everywhere in this skin,
+   because AO3 validates them with /^[a-zA-Z][\w\-]+$/ and silently drops
+   any single-character class from the posted work. .bub was .b once. */
 .row{overflow:hidden;margin:0 0 5px}
-.b{display:inline-block;max-width:76%;padding:7px 11px;border-radius:17px;font-size:13px;line-height:1.4;word-wrap:break-word}
+.bub{display:inline-block;max-width:76%;padding:7px 11px;border-radius:17px;font-size:13px;line-height:1.4;word-wrap:break-word}
 .them{float:left;background-color:#262b37;color:#eef1f8}
 .me{float:right;background-color:#2f6df6;background-image:linear-gradient(#3f7dff,#2258d4);color:#fff}
 .ts{clear:both;text-align:center;font-size:10px;color:#7b8396;padding:12px 0 7px}
@@ -141,8 +144,8 @@
 .dot{display:inline-block;width:11px;height:11px;margin:0 7px;border-radius:6px;border:1px solid #99a2b6}
 .on{background-color:#fff;border-color:#fff}
 .kp{text-align:center;font-size:0;padding-top:4px}
-.k{display:inline-block;width:62px;height:62px;line-height:62px;margin:7px;border-radius:30px;background-color:#262b37;color:#fff;font-size:22px;text-align:center}
-.k:hover{background-color:#39404f}
+.key{display:inline-block;width:62px;height:62px;line-height:62px;margin:7px;border-radius:30px;background-color:#262b37;color:#fff;font-size:22px;text-align:center}
+.key:hover{background-color:#39404f}
 .wrong{text-align:center;padding-top:150px}
 .wrong b{display:block;font-size:15px;color:#ff6b60}
 .wrong span{display:block;font-size:12px;color:#8b93a6;padding:8px 22px 16px}

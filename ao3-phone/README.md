@@ -55,8 +55,30 @@ No pseudo-classes, no ids, no scripts. The first pane in the markup is what
 readers see before they tap anything, which is why the lock screen comes
 first, and the browser's back button walks the history like a back gesture.
 
-Two more things the archive does to your markup, both harmless but worth
-knowing when something looks 18 pixels off:
+### Class names need two characters
+
+The other rule that will bite you. AO3 validates every class name in a work:
+
+```ruby
+def valid_class?(str)
+  str =~ /^[a-zA-Z][\w\-]+$/      # a letter, then ONE OR MORE more chars
+end
+```
+
+Note the `+`. A one-character class is thrown away, so `class="b them"` is
+posted as `class="them"` — and because the skin still has its `.b` rule,
+nothing errors anywhere. It just silently stops applying. That is how the
+message bubbles arrived on the archive with their colour and alignment
+intact but no padding, no `inline-block` and no `border-radius`. The bubble
+class is `.bub` for that reason, and the keypad's is `.key`.
+
+So: **every class in this skin is at least two characters long, and starts
+with a letter.** `ao3check.py` enforces it on both the markup and the
+stylesheet.
+
+### Two more things the archive does
+
+Both harmless, but worth knowing when something looks 18 pixels off:
 
 - It wraps every run of loose inline tags in a `<p>` of its own — about 170
   paragraphs get injected into this phone. Hence `.phone p{margin:0}`, and
@@ -158,12 +180,14 @@ source, and fails the build on anything the archive would drop:
 | what | where it comes from |
 | --- | --- |
 | allowed elements and attributes | `config/initializers/gem-plugin_config/sanitizer_config.rb` |
+| valid class names | `lib/otw_sanitize/user_class_sanitizer.rb` |
 | allowed CSS properties | `config/config.yml` — `SUPPORTED_CSS_PROPERTIES` |
 | allowed CSS values | `lib/css_cleaner.rb` |
 | paragraph wrapping | `lib/paragraph_maker.rb` |
 
-Worth re-running if you add anything: `display: grid`, `gap`, `calc()` and
-custom properties all look fine locally and all vanish on the archive.
+Worth re-running if you add anything: `display: grid`, `gap`, `calc()`,
+custom properties and any one-character class all look fine locally and all
+vanish on the archive.
 
 ## The demo story in it
 
