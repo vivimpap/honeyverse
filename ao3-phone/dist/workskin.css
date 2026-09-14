@@ -39,24 +39,24 @@
 .anc{position:absolute;top:0;left:0;width:0;height:0;margin:0;overflow:hidden}
 .lockpane{background-color:#1a2133;background-image:linear-gradient(165deg,#1d2740,#2d1f33 58%,#3b2434)}
 
-/* ---------- chrome ---------- */
-.sb{position:absolute;top:9px;left:9px;right:9px;height:22px;line-height:22px;font-size:10px;color:#d6dae6;z-index:20}
-.sb b{position:absolute;left:16px;top:0;font-weight:600}
-.sb i{position:absolute;right:14px;top:0;font-style:normal;letter-spacing:1px}
+/* ---------- chrome ----------
+   No status bar. It sat above every screen at z-index 20, which meant a
+   22px strip along the top of the phone swallowed taps aimed at the back
+   arrow just below it. The screens start at the top edge instead. */
 .hi{position:absolute;left:109px;bottom:15px;width:90px;height:4px;border-radius:2px;background-color:#7b8196;z-index:20}
 
-.hd{position:absolute;top:22px;left:0;right:0;height:42px;line-height:42px;z-index:9;background-color:#171b24;border-bottom:1px solid #242936}
+.hd{position:absolute;top:0;left:0;right:0;height:42px;line-height:42px;z-index:9;background-color:#171b24;border-bottom:1px solid #242936}
 .hd .ti{display:block;text-align:center;font-size:13px;font-weight:600;color:#fff}
 .hd .two{line-height:28px}
 .hd .sub{position:absolute;left:0;right:0;top:25px;text-align:center;font-size:9px;font-weight:400;color:#8d95a8;line-height:1}
-.hd .bk{position:absolute;left:6px;top:0;padding:0 6px;font-size:15px;color:#7fa4ff}
+.hd .bk{position:absolute;left:0;top:0;padding:0 12px;font-size:15px;color:#7fa4ff}
 .hd .ac{position:absolute;right:10px;top:0;font-size:11px;color:#7fa4ff}
 
-.bd{position:absolute;top:64px;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 22px}
+.bd{position:absolute;top:42px;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 22px}
 .flush{padding:0 0 22px}
 
 /* ---------- lock screen ---------- */
-.lk-t{padding-top:58px;text-align:center;font-size:52px;font-weight:300;letter-spacing:-1px;line-height:1}
+.lk-t{padding-top:74px;text-align:center;font-size:52px;font-weight:300;letter-spacing:-1px;line-height:1}
 .lk-d{text-align:center;font-size:12px;color:#c3cadb;padding-top:4px}
 .lk-n{display:block;margin:10px 12px;padding:9px 11px;border-radius:14px;background-color:#3a4055;background-image:linear-gradient(rgba(255,255,255,.16),rgba(255,255,255,.06))}
 .lk-n b{display:block;font-size:10px;letter-spacing:.4px;text-transform:uppercase;color:#c9d0e2;font-weight:600}
@@ -66,7 +66,7 @@
 
 /* ---------- home screen ---------- */
 .wall{background-color:#182034;background-image:linear-gradient(165deg,#1d2740,#2d1f33 58%,#3b2434)}
-.apps{position:absolute;top:34px;left:6px;right:6px;bottom:96px;overflow-y:auto;font-size:0}
+.apps{position:absolute;top:12px;left:6px;right:6px;bottom:96px;overflow-y:auto;font-size:0}
 .app{display:inline-block;width:25%;vertical-align:top;text-align:center;padding:9px 0;font-size:0}
 .ic{display:inline-block;position:relative;width:46px;height:46px;line-height:46px;border-radius:13px;text-align:center;font-size:19px;color:#fff;background-color:#3a4152}
 .lb{display:block;font-size:9px;color:#e4e8f2;padding-top:5px;letter-spacing:.2px}
@@ -115,17 +115,60 @@
 
 /* ---------- photos ---------- */
 .grid{font-size:0;padding:2px}
-.ph{display:inline-block;width:84px;height:84px;margin:1px;border-radius:3px;background-color:#39415a}
+.ph{position:relative;display:inline-block;width:84px;height:84px;margin:1px;border-radius:3px;overflow:hidden;background-color:#39415a}
 .pa{background-image:linear-gradient(150deg,#f0a35e,#c2456b)}
 .pb{background-image:linear-gradient(150deg,#5c74c4,#20304f)}
 .pc{background-image:linear-gradient(150deg,#4e9e7a,#1e3a3f)}
 .pd{background-image:linear-gradient(150deg,#b06ab3,#3c2a5c)}
 .pe{background-image:linear-gradient(150deg,#d9d1c0,#8a7a63)}
 .pf{background-image:linear-gradient(150deg,#3a4353,#151a24)}
-.ph img{width:84px;height:84px;border-radius:3px}
-.big{display:block;width:250px;height:250px;margin:14px auto 0;border-radius:8px;background-color:#39415a}
-.big img{width:250px;height:250px;border-radius:8px}
+/* AO3 has no object-fit, so centre-crop by hand: let the image overflow on
+   its long axis and pull it back by half its own width and height. */
+.ph img,.big img{position:absolute;top:50%;left:50%;width:auto;height:auto;max-width:none;min-width:100%;min-height:100%;transform:translatex(-50%) translatey(-50%)}
+.big{position:relative;display:block;width:250px;height:250px;margin:14px auto 0;border-radius:8px;overflow:hidden;background-color:#39415a}
 .cap{padding:14px 4px 0;font-size:12px;color:#b9c1d4;text-align:center;font-style:italic}
+
+/* ---------- Glimpse: the photo-sharing app ----------
+   Rename it to whatever you like — the label lives in one place on the home
+   screen and one in each header. Full-bleed, so these panes use .flush. */
+.gtray{white-space:nowrap;overflow-x:auto;overflow-y:hidden;font-size:0;padding:8px 4px;border-bottom:1px solid #1d222d}
+.gstory{display:inline-block;width:54px;text-align:center;vertical-align:top}
+.gring{display:inline-block;width:40px;height:40px;line-height:40px;border-radius:21px;border:2px solid #d9487f;text-align:center;font-size:14px;font-weight:600;color:#fff;background-color:#4a5267}
+.gname{display:block;font-size:8px;color:#99a2b6;padding-top:3px;overflow:hidden}
+.post{border-bottom:1px solid #1d222d;padding-bottom:8px}
+.phead{display:block;position:relative;padding:8px 10px 8px 44px;min-height:30px}
+.pav{position:absolute;left:8px;top:7px;width:28px;height:28px;line-height:28px;border-radius:15px;text-align:center;font-size:12px;font-weight:600;color:#fff;background-color:#4a5267}
+.puser{display:block;font-size:12px;font-weight:600;color:#fff}
+.pwhere{display:block;font-size:9px;color:#8b93a6}
+.pshot{position:relative;display:block;width:290px;height:250px;overflow:hidden;background-color:#39415a}
+.pacts{padding:7px 10px 2px;font-size:13px;color:#eef1f8;letter-spacing:2px}
+.plikes{padding:0 10px;font-size:11px;font-weight:600;color:#fff}
+.pcap{padding:4px 10px 0;font-size:12px;color:#dfe4ef}
+.pcap b{font-weight:600;color:#fff}
+.pmore{display:block;padding:5px 10px 0;font-size:11px;color:#8b93a6}
+.pwhen{display:block;padding:5px 10px 0;font-size:9px;color:#6f778a;letter-spacing:.5px;text-transform:uppercase}
+.heart{color:#ff4d6d}
+
+/* profile */
+.gprof{padding:14px 10px 6px}
+.gpav{display:inline-block;width:68px;height:68px;line-height:68px;border-radius:35px;text-align:center;font-size:26px;font-weight:600;color:#fff;background-color:#6a4a8f;background-image:linear-gradient(#8f63bd,#4a2f6b);vertical-align:middle}
+.gstats{display:inline-block;vertical-align:middle;padding-left:14px;font-size:0}
+.gstat{display:inline-block;width:58px;text-align:center}
+.gstat b{display:block;font-size:14px;font-weight:600;color:#fff}
+.gstat span{display:block;font-size:9px;color:#99a2b6}
+.gbio{padding:10px 10px 0;font-size:12px;color:#dfe4ef}
+.gbio b{display:block;color:#fff;font-size:13px}
+.gbtns{padding:12px 8px 10px;font-size:0}
+.gbtn{display:inline-block;width:47%;margin:0 1%;padding:7px 0;border-radius:8px;text-align:center;font-size:12px;font-weight:600;background-color:#262b37;color:#eef1f8}
+.gfollow{background-color:#3478f6;color:#fff}
+
+/* comments */
+.cmt{position:relative;padding:9px 10px 9px 44px;border-bottom:1px solid #171b24}
+.cmt .pav{top:8px}
+.cmt b{font-size:12px;font-weight:600;color:#fff}
+.cmt span{display:block;font-size:12px;color:#cfd5e2}
+.cmt em{display:block;font-style:normal;font-size:9px;color:#6f778a;padding-top:3px}
+.gone{color:#6f778a;font-style:italic}
 
 /* ---------- notes / mail / pages ---------- */
 .note{padding:2px 2px 14px}
@@ -138,7 +181,7 @@
 .mlhd span{display:block;font-size:11px;color:#8b93a6;padding-top:3px}
 
 /* ---------- passcode ---------- */
-.pctitle{text-align:center;font-size:14px;color:#fff;padding-top:48px}
+.pctitle{text-align:center;font-size:14px;color:#fff;padding-top:66px}
 .pcsub{text-align:center;font-size:11px;color:#8b93a6;padding-top:5px}
 .dots{text-align:center;padding:18px 0 8px;font-size:0}
 .dot{display:inline-block;width:11px;height:11px;margin:0 7px;border-radius:6px;border:1px solid #99a2b6}
@@ -146,9 +189,10 @@
 .kp{text-align:center;font-size:0;padding-top:4px}
 .key{display:inline-block;width:62px;height:62px;line-height:62px;margin:7px;border-radius:30px;background-color:#262b37;color:#fff;font-size:22px;text-align:center}
 .key:hover{background-color:#39404f}
-.wrong{text-align:center;padding-top:150px}
+.wrong{text-align:center;padding-top:168px}
 .wrong b{display:block;font-size:15px;color:#ff6b60}
 .wrong span{display:block;font-size:12px;color:#8b93a6;padding:8px 22px 16px}
 .btn{display:inline-block;padding:8px 18px;border-radius:18px;background-color:#3478f6;color:#fff;font-size:12px}
 .g9{background-color:#ffffff;background-image:none;color:#d9304f;font-size:17px;font-weight:700}
 .glock{background-color:#2a2f3d;background-image:linear-gradient(#3a4152,#1f2530)}
+.gglim{background-color:#c13584;background-image:linear-gradient(#f0a54a,#c13584 55%,#7a3fd1)}

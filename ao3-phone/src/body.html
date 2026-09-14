@@ -37,6 +37,7 @@
       <a class="app" href="#web"><span class="ic g5">&#8981;</span><span class="lb">Browser</span></a>
       <a class="app" href="#photos"><span class="ic g7">&#9673;</span><span class="lb">Camera</span></a>
       <a class="app" href="#music"><span class="ic g8">&#9834;</span><span class="lb">Music</span></a>
+      <a class="app" href="#glimpse"><span class="ic gglim">&#9635;<span class="bdg">5</span></span><span class="lb">Glimpse</span></a>
       <a class="app" href="#cal"><span class="ic g9">19</span><span class="lb">Calendar</span></a>
       <a class="app" href="#settings"><span class="ic g7">&#9881;</span><span class="lb">Settings</span></a>
       <a class="app" href="#pc1"><span class="ic glock">&#8856;</span><span class="lb">Locked</span></a>
@@ -185,6 +186,9 @@
   <div class="pane"><p class="anc"><a name="photos"></a></p>
     <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Recents</span><span class="ac">Select</span></div>
     <div class="bd flush">
+      <!-- To use a real photograph, put an <img> inside the tile and drop the
+           colour class:  <a class="ph" href="#ph1"><img src="https://your-host.example/pic.jpg" alt=""/></a>
+           Same inside .big on a detail screen. The skin centre-crops it. -->
       <div class="grid">
         <a class="ph pa" href="#ph1"></a><a class="ph pb" href="#ph2"></a><a class="ph pc" href="#ph3"></a>
         <a class="ph pd" href="#ph2"></a><a class="ph pe" href="#ph1"></a><a class="ph pf" href="#ph3"></a>
@@ -203,6 +207,85 @@
   <div class="pane"><p class="anc"><a name="ph3"></a></p>
     <div class="hd"><a class="bk" href="#photos">&#8249; Photos</a><span class="ti two">Screenshot</span><span class="sub">Saved 1:11 AM</span></div>
     <div class="bd"><span class="big pc"></span><div class="cap">A screenshot of a message thread that has since been deleted. The only line still legible: <b>&ldquo;he already knows, you know.&rdquo;</b></div></div>
+  </div>
+
+
+  <!-- ============ GLIMPSE — the photo-sharing app ============
+       Three panes: the feed, one post with its comments, and a profile.
+       Rename the app by editing the label on the home screen and the .ti
+       in each header below. -->
+  <div class="pane"><p class="anc"><a name="glimpse"></a></p>
+    <div class="hd"><a class="bk" href="#home">&#8249; Home</a><span class="ti">Glimpse</span><a class="ac" href="#gpost">&#9825;</a></div>
+    <div class="bd flush">
+      <div class="gtray">
+        <a class="gstory" href="#gprof"><span class="gring">S</span><span class="gname">sol.</span></a>
+        <a class="gstory" href="#t-wren"><span class="gring">W</span><span class="gname">wren.exe</span></a>
+        <a class="gstory" href="#t-grp"><span class="gring">T</span><span class="gname">taeandonly</span></a>
+        <a class="gstory" href="#t-grp"><span class="gring">J</span><span class="gname">jinnie</span></a>
+        <a class="gstory" href="#photos"><span class="gring">+</span><span class="gname">your story</span></a>
+      </div>
+      <div class="post">
+        <a class="phead" href="#gpost"><span class="pav g2">W</span><span class="puser">wren.exe</span><span class="pwhere">rooftop, east stairwell</span></a>
+        <a class="pshot pa" href="#gpost"></a>
+        <div class="pacts"><span class="heart">&#9829;</span> &#9711; &#9993;</div>
+        <div class="plikes">214 likes</div>
+        <div class="pcap"><b>wren.exe</b> the whole roof was ours for about four minutes</div>
+        <a class="pmore" href="#gpost">View all 18 comments</a>
+        <span class="pwhen">2 hours ago</span>
+      </div>
+      <div class="post">
+        <a class="phead" href="#t-grp"><span class="pav g4">T</span><span class="puser">taeandonly</span><span class="pwhere">the venue, closing time</span></a>
+        <a class="pshot pe" href="#t-grp"></a>
+        <div class="pacts"><span class="heart">&#9829;</span> &#9711; &#9993;</div>
+        <div class="plikes">1,204 likes</div>
+        <div class="pcap"><b>taeandonly</b> speeches we all missed &#127881; anyway who took the last jjajangmyeon</div>
+        <a class="pmore" href="#t-grp">View all 57 comments</a>
+        <span class="pwhen">Yesterday</span>
+      </div>
+      <div class="post">
+        <a class="phead" href="#gprof"><span class="pav g5">S</span><span class="puser">sol.</span><span class="pwhere">&mdash;</span></a>
+        <a class="pshot pb" href="#gprof"></a>
+        <div class="pacts"><span class="heart">&#9829;</span> &#9711; &#9993;</div>
+        <div class="plikes">3 likes</div>
+        <div class="pcap"><b>sol.</b> four years</div>
+        <span class="pwhen">19 April, 2:41 am</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane"><p class="anc"><a name="gpost"></a></p>
+    <div class="hd"><a class="bk" href="#glimpse">&#8249; Glimpse</a><span class="ti two">Comments</span><span class="sub">wren.exe &middot; 18</span></div>
+    <div class="bd flush">
+      <div class="cmt"><span class="pav g2">W</span><b>wren.exe</b><span>the whole roof was ours for about four minutes</span><em>2h</em></div>
+      <div class="cmt"><span class="pav g4">T</span><b>taeandonly</b><span>who took this</span><em>2h</em></div>
+      <div class="cmt"><span class="pav g2">W</span><b>wren.exe</b><span>not me</span><em>2h</em></div>
+      <div class="cmt"><span class="pav g4">T</span><b>taeandonly</b><span>wren it&rsquo;s timestamped 2:06 and you posted it at 2:09</span><em>1h</em></div>
+      <div class="cmt"><span class="pav g7">?</span><b>&nbsp;</b><span class="gone">This comment was deleted.</span><em>1h</em></div>
+      <div class="cmt"><span class="pav g3">M</span><b>mom</b><span>is this where you were last night</span><em>47m</em></div>
+      <div class="cmt"><span class="pav g5">S</span><b>sol.</b><span class="gone">liked this</span><em>12m</em></div>
+    </div>
+  </div>
+
+  <div class="pane"><p class="anc"><a name="gprof"></a></p>
+    <div class="hd"><a class="bk" href="#glimpse">&#8249; Glimpse</a><span class="ti two">sol.</span><span class="sub">private &middot; you follow each other</span></div>
+    <div class="bd flush">
+      <div class="gprof">
+        <span class="gpav">S</span>
+        <span class="gstats">
+          <span class="gstat"><b>3</b><span>posts</span></span>
+          <span class="gstat"><b>41</b><span>followers</span></span>
+          <span class="gstat"><b>1</b><span>following</span></span>
+        </span>
+      </div>
+      <div class="gbio"><b>&mdash;</b>no captions. nothing since april.</div>
+      <div class="gbtns">
+        <a class="gbtn gfollow" href="#vault">Message</a><a class="gbtn" href="#gpost">Tagged</a>
+      </div>
+      <div class="grid">
+        <a class="ph pb" href="#ph2"></a><a class="ph pf" href="#ph3"></a><a class="ph pa" href="#ph1"></a>
+      </div>
+      <div class="cmt"><span class="pav g5">S</span><b>sol.</b><span class="gone">The only account this one follows is yours.</span><em>&nbsp;</em></div>
+    </div>
   </div>
 
   <!-- ============ NOTES ============ -->
@@ -409,9 +492,8 @@
   </div>
 
 </div>
-  <!-- status bar + home bar: siblings of the scrolling window, so they
-       stay put while the screens move underneath them -->
-  <div class="sb"><b>2:14</b><i>&#9601;&#9603;&#9605; 5G &#9646;</i></div>
+  <!-- home bar: a sibling of the scrolling window, so it stays put while
+       the screens move underneath it -->
   <div class="hi"></div>
 </div>
 <p class="hint">Tap the screen to move around. &#8249; goes back, and your browser&rsquo;s back button works too. Something in here is locked.</p>

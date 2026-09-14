@@ -143,13 +143,17 @@ new name, and link to it from somewhere:
 Keep it a direct child of `.vp`, alongside the other panes, and don't nest
 panes — the strip only works because every pane is the same height.
 
+**Renaming Glimpse.** The photo-sharing app is deliberately fictional. Its
+name appears in exactly four places: the `.lb` label on the home screen and
+the `.ti` in the three pane headers (`#glimpse`, `#gpost`, `#gprof`).
+
 **A new app icon.** Add to `.apps` on the home pane:
 
 ```html
 <a class="app" href="#your-screen"><span class="ic g5">&#9834;</span><span class="lb">Label</span></a>
 ```
 
-`g1`–`g9` are the icon colours; add `<span class="bdg">2</span>` inside the
+`g1`–`g9` are the icon colours (plus `gglim` and `glock`); add `<span class="bdg">2</span>` inside the
 `.ic` for an unread badge. Icons are text characters (`&#9993;` and friends)
 so they need no image hosting.
 
@@ -160,12 +164,43 @@ to `7` on `#pc1`, `8` on `#pc2`, `1` on `#pc3`, `2` on `#pc4` — and plant the
 new clue somewhere (right now the date is in a note, a photo caption, and the
 unknown number's last four digits).
 
-**Real photos.** AO3 allows `<img>` from any https host, so if you have images
-hosted somewhere, swap a coloured tile for one:
+## Real photographs in the gallery
+
+Yes. AO3 allows `<img>` in a work from any http/https host, and images show
+up even for readers who have work skins turned off, which the coloured
+placeholder tiles do not. Drop an `<img>` inside a tile and remove its
+colour class:
 
 ```html
-<a class="ph" href="#ph1"><img src="https://example.com/pic.jpg" alt=""/></a>
+<a class="ph" href="#ph1"><img src="https://your-host.example/pic.jpg" alt="a rooftop at 2am"/></a>
 ```
+
+Same inside `.big` on a photo detail screen, or inside `.pshot` for a post
+in Glimpse. The skin centre-crops whatever you give it, so any aspect ratio
+works — AO3 has no `object-fit`, so `.ph img` does it the old way, letting
+the image overflow on its long axis and pulling it back by half its own
+width and height. Square-ish crops waste the least of the picture.
+
+Sizes, so you know what to export: gallery tiles are 84×84, photo details
+250×250, Glimpse posts 290×250. Nothing needs to be wider than about 600px.
+
+What to watch for:
+
+- **AO3 does not host images.** You need them somewhere else and you link to
+  them. Any host that allows hotlinking over https works — imgbox,
+  postimages, ImgBB, a Dreamwidth scrapbook, your own site, GitHub Pages.
+  Avoid Discord CDN links (they expire) and Google Photos or Drive share
+  links (they aren't direct image URLs).
+- **Only these attributes survive** on an `<img>`: `align alt border height
+  src width`, plus `class`. No `style`, no `srcset`, no `loading`.
+- **Relative paths don't work** — AO3 rewrites them against its own domain.
+  Always a full `https://` URL.
+- Write real `alt` text. It's the only description a screen-reader gets, and
+  it's the fallback when a host goes down mid-fic.
+
+A work skin may also use `background-image: url(https://…)`, but the archive
+only accepts a URL that ends in `.jpg`, `.jpeg`, `.png` or `.gif` with no
+query string, which rules out a lot of CDN links. `<img>` is the easier road.
 
 **Colours.** The screen background is `#101218`, incoming bubbles `#262b37`,
 outgoing `#2f6df6`, the wallpaper is the gradient on `.wall` and `.lockpane`.
@@ -188,6 +223,18 @@ source, and fails the build on anything the archive would drop:
 Worth re-running if you add anything: `display: grid`, `gap`, `calc()`,
 custom properties and any one-character class all look fine locally and all
 vanish on the archive.
+
+## What's on the home screen
+
+Twelve apps. Messages (five threads), Phone (recents and a voicemail
+transcript), Photos, Notes, Mail, Browser (search history), Camera, Music,
+**Glimpse** — a photo-sharing app with a feed, a post and its comment
+thread, and a profile — Calendar, Settings, and one app behind a passcode.
+
+There is no status bar. It sat above every screen at `z-index: 20`, so a
+22px strip along the top of the phone quietly swallowed taps meant for the
+back arrow underneath it. The screens start at the top edge instead, and
+the back arrow is a full-height target now.
 
 ## The demo story in it
 
